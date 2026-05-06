@@ -8,7 +8,7 @@ import requests
 import threading
 import time
 import hashlib
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from functools import wraps
 
 # ============================================================
@@ -76,6 +76,64 @@ def send_telegram(message):
 
 
 # ============================================================
+# SERVICE ITEM HELPERS
+# ============================================================
+
+def get_service_status(last_service_date, frequency_days):
+    """
+    Works out how overdue or how soon a service item is.
+    Returns a dict with all the info needed for display.
+    """
+    if not last_service_date or not frequency_days:
+        return {
+            "next_due"     : None,
+            "days_until"   : None,
+            "days_overdue" : None,
+            "status"       : "unknown",
+            "pct"          : 0
+        }
+
+    try:
+        last   = datetime.strptime(
+            last_service_date, "%Y-%m-%d"
+        ).date()
+        freq   = int(frequency_days)
+        next_due = last + timedelta(days=freq)
+        today    = date.today()
+        days_until = (next_due - today).days
+
+        if days_until < 0:
+            status = "overdue"
+            pct    = 100
+        elif days_until <= 7:
+            status = "due-soon"
+            days_passed = (today - last).days
+            pct = min(int((days_passed / freq) * 100), 100)
+        else:
+            days_passed = (today - last).days
+            pct = min(int((days_passed / freq) * 100), 100)
+            status = "ok"
+
+        return {
+            "next_due"     : str(next_due),
+            "days_until"   : days_until,
+            "days_overdue" : abs(days_until) if days_until < 0 else 0,
+            "status"       : status,
+            "pct"          : pct
+        }
+
+    except Exception as e:
+        print(f"Service status error: {e}")
+        return {
+            "next_due"     : None,
+            "days_until"   : None,
+            "days_overdue" : None,
+            "status"       : "unknown",
+            "pct"          : 0
+        }
+
+
+# ============================================================
 # DAILY BRIEFING
 # ============================================================
 
@@ -93,8 +151,10 @@ def build_daily_briefing():
         ""
     ]
 
+    # ── Quantifiable inventory ─────────────────────────────
     inventory = conn.execute(
-        "SELECT * FROM inventory ORDER BY name"
+        "SELECT * FROM inventory WHERE item_type = 'quantifiable'"
+        " ORDER BY name"
     ).fetchall()
 
     low_stock = []
@@ -102,7 +162,9 @@ def build_daily_briefing():
 
     for item in inventory:
         if item["regular_stock"] > 0:
-            pct = (item["current_stock"] / item["regular_stock"]) * 100
+            pct = (
+                item["current_stock"] / item["regular_stock"]
+            ) * 100
             if pct <= 25:
                 low_stock.append((item, int(pct)))
             else:
@@ -126,12 +188,49 @@ def build_daily_briefing():
             )
         lines.append("")
 
-    if not inventory:
-        lines.append("📦 No inventory items tracked yet.")
+    # ── Service based inventory ────────────────────────────
+    services = conn.execute(
+        "SELECT * FROM inventory WHERE item_type = 'service'"
+        " ORDER BY name"
+    ).fetchall()
+
+    overdue_services  = []
+    due_soon_services = []
+
+    for svc in services:
+        status = get_service_status(
+            svc["last_service_date"],
+            svc["frequency_days"]
+        )
+        if status["status"] == "overdue":
+            overdue_services.append((svc, status))
+        elif status["status"] == "due-soon":
+            due_soon_services.append((svc, status))
+
+    if overdue_services:
+        lines.append("🔧 <b>SERVICES OVERDUE:</b>")
+        for svc, status in overdue_services:
+            lines.append(
+                f"  • {svc['name']} — "
+                f"{status['days_overdue']} days overdue"
+            )
         lines.append("")
 
+    if due_soon_services:
+        lines.append("🔧 <b>Services Due Soon:</b>")
+        for svc, status in due_soon_services:
+            lines.append(
+                f"  • {svc['name']} — due {status['next_due']}"
+            )
+        lines.append("")
+
+    # ── Renewals ───────────────────────────────────────────
     upcoming_renewals = []
-    for item in inventory:
+    all_inventory = conn.execute(
+        "SELECT * FROM inventory"
+    ).fetchall()
+
+    for item in all_inventory:
         if item["renewal_date"]:
             try:
                 renewal   = datetime.strptime(
@@ -155,6 +254,7 @@ def build_daily_briefing():
             lines.append(f"  • {item['name']} — due {label}")
         lines.append("")
 
+    # ── Reminders ──────────────────────────────────────────
     due_today = conn.execute("""
         SELECT * FROM reminders
         WHERE done = 0 AND due_date = ?
@@ -176,7 +276,7 @@ def build_daily_briefing():
     """, (today_str,)).fetchall()
 
     if overdue:
-        lines.append("❌ <b>OVERDUE:</b>")
+        lines.append("❌ <b>OVERDUE Reminders:</b>")
         for r in overdue:
             lines.append(
                 f"  • {r['title']} (was due {r['due_date']})"
@@ -197,6 +297,7 @@ def build_daily_briefing():
             lines.append(f"  • {r['title']} — {r['due_date']}")
         lines.append("")
 
+    # ── Spending ───────────────────────────────────────────
     month_start   = (
         f"{date.today().year}-{date.today().month:02d}-01"
     )
@@ -270,10 +371,54 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             category TEXT NOT NULL,
-            current_stock REAL NOT NULL,
-            regular_stock REAL NOT NULL,
-            unit TEXT NOT NULL,
+            item_type TEXT NOT NULL DEFAULT 'quantifiable',
+            current_stock REAL,
+            regular_stock REAL,
+            unit TEXT,
             renewal_date TEXT,
+            last_service_date TEXT,
+            frequency_days INTEGER,
+            avg_cost REAL,
+            notes TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Add new columns to existing database if upgrading
+    try:
+        cursor.execute(
+            "ALTER TABLE inventory ADD COLUMN item_type TEXT DEFAULT 'quantifiable'"
+        )
+    except:
+        pass
+
+    try:
+        cursor.execute(
+            "ALTER TABLE inventory ADD COLUMN last_service_date TEXT"
+        )
+    except:
+        pass
+
+    try:
+        cursor.execute(
+            "ALTER TABLE inventory ADD COLUMN frequency_days INTEGER"
+        )
+    except:
+        pass
+
+    try:
+        cursor.execute(
+            "ALTER TABLE inventory ADD COLUMN avg_cost REAL"
+        )
+    except:
+        pass
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS service_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            inventory_id INTEGER NOT NULL,
+            service_date TEXT NOT NULL,
+            cost REAL,
             notes TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
@@ -322,18 +467,36 @@ def init_db():
 def check_and_alert():
     conn           = get_db()
     inventory      = conn.execute(
-        "SELECT * FROM inventory"
+        "SELECT * FROM inventory WHERE item_type = 'quantifiable'"
     ).fetchall()
     low_stock_msgs = []
 
     for item in inventory:
-        if item["regular_stock"] > 0:
-            pct = (item["current_stock"] / item["regular_stock"]) * 100
+        if item["regular_stock"] and item["regular_stock"] > 0:
+            pct = (
+                item["current_stock"] / item["regular_stock"]
+            ) * 100
             if pct <= 25:
                 low_stock_msgs.append(
                     f"  • {item['name']}: {item['current_stock']}"
                     f" {item['unit']} ({int(pct)}% left)"
                 )
+
+    services = conn.execute(
+        "SELECT * FROM inventory WHERE item_type = 'service'"
+    ).fetchall()
+
+    service_msgs = []
+    for svc in services:
+        status = get_service_status(
+            svc["last_service_date"],
+            svc["frequency_days"]
+        )
+        if status["status"] == "overdue":
+            service_msgs.append(
+                f"  • {svc['name']} — "
+                f"{status['days_overdue']} days overdue"
+            )
 
     today_str = str(date.today())
     overdue   = conn.execute(
@@ -349,13 +512,18 @@ def check_and_alert():
 
     conn.close()
 
-    if low_stock_msgs or overdue_msgs:
+    if low_stock_msgs or overdue_msgs or service_msgs:
         lines = ["🏠 <b>AndyOS Alert</b>"]
 
         if low_stock_msgs:
             lines.append("")
             lines.append("📦 <b>Low Stock:</b>")
             lines.extend(low_stock_msgs)
+
+        if service_msgs:
+            lines.append("")
+            lines.append("🔧 <b>Overdue Services:</b>")
+            lines.extend(service_msgs)
 
         if overdue_msgs:
             lines.append("")
@@ -451,9 +619,25 @@ def home():
     conn   = get_db()
     cursor = conn.cursor()
 
+    # Quantifiable items
     inventory = cursor.execute(
-        "SELECT * FROM inventory ORDER BY name"
+        "SELECT * FROM inventory WHERE item_type = 'quantifiable'"
+        " ORDER BY name"
     ).fetchall()
+
+    # Service based items with status
+    services_raw = cursor.execute(
+        "SELECT * FROM inventory WHERE item_type = 'service'"
+        " ORDER BY name"
+    ).fetchall()
+
+    services = []
+    for svc in services_raw:
+        status = get_service_status(
+            svc["last_service_date"],
+            svc["frequency_days"]
+        )
+        services.append((svc, status))
 
     expenses = cursor.execute(
         "SELECT * FROM expenses ORDER BY date DESC LIMIT 5"
@@ -474,12 +658,17 @@ def home():
 
     low_stock = []
     for item in inventory:
-        if item["regular_stock"] > 0:
+        if item["regular_stock"] and item["regular_stock"] > 0:
             percentage = (
                 item["current_stock"] / item["regular_stock"]
             ) * 100
             if percentage <= 25:
                 low_stock.append(item)
+
+    overdue_services = [
+        (svc, st) for svc, st in services
+        if st["status"] == "overdue"
+    ]
 
     today_str = str(date.today())
     overdue   = [r for r in reminders if r["due_date"] < today_str]
@@ -491,10 +680,12 @@ def home():
     return render_template(
         "home.html",
         inventory=inventory,
+        services=services,
         expenses=expenses,
         reminders=reminders,
         monthly_total=monthly_total,
         low_stock=low_stock,
+        overdue_services=overdue_services,
         overdue=overdue,
         today=today_str
     )
@@ -508,46 +699,157 @@ def home():
 @login_required
 def add_item():
     if request.method == "POST":
-        name          = request.form.get("name", "").strip()
-        category      = request.form.get("category", "").strip()
-        current_stock = request.form.get("current_stock", 0)
-        regular_stock = request.form.get("regular_stock", 0)
-        unit          = request.form.get("unit", "").strip()
-        renewal_date  = request.form.get("renewal_date", "").strip()
-        notes         = request.form.get("notes", "").strip()
+        item_type = request.form.get("item_type", "quantifiable")
+        name      = request.form.get("name", "").strip()
+        category  = request.form.get("category", "").strip()
+        notes     = request.form.get("notes", "").strip()
 
-        if not name or not category or not unit:
+        if not name or not category:
             return render_template(
                 "add.html",
-                error="Name, category, and unit are required.",
+                error="Name and category are required.",
                 section="inventory"
             )
 
         conn = get_db()
+
+        if item_type == "quantifiable":
+            current_stock = request.form.get("current_stock", 0)
+            regular_stock = request.form.get("regular_stock", 0)
+            unit          = request.form.get("unit", "").strip()
+            renewal_date  = request.form.get("renewal_date", "").strip()
+
+            conn.execute("""
+                INSERT INTO inventory
+                (name, category, item_type, current_stock,
+                 regular_stock, unit, renewal_date, notes)
+                VALUES (?, ?, 'quantifiable', ?, ?, ?, ?, ?)
+            """, (
+                name, category, float(current_stock),
+                float(regular_stock), unit,
+                renewal_date or None, notes or None
+            ))
+
+            send_telegram(
+                f"✅ <b>New Inventory Item Added</b>\n\n"
+                f"📦 <b>{name}</b>\n"
+                f"Category: {category}\n"
+                f"Stock: {current_stock} / {regular_stock} {unit}"
+            )
+
+        else:  # service
+            last_service_date = request.form.get(
+                "last_service_date", ""
+            ).strip()
+            frequency_days = request.form.get("frequency_days", 30)
+            avg_cost       = request.form.get("avg_cost", 0)
+
+            conn.execute("""
+                INSERT INTO inventory
+                (name, category, item_type, last_service_date,
+                 frequency_days, avg_cost, notes)
+                VALUES (?, ?, 'service', ?, ?, ?, ?)
+            """, (
+                name, category,
+                last_service_date or None,
+                int(frequency_days),
+                float(avg_cost) if avg_cost else None,
+                notes or None
+            ))
+
+            send_telegram(
+                f"🔧 <b>New Service Item Added</b>\n\n"
+                f"⚙️ <b>{name}</b>\n"
+                f"Category: {category}\n"
+                f"Frequency: every {frequency_days} days"
+            )
+
+        conn.commit()
+        conn.close()
+        return redirect(url_for("home"))
+
+    return render_template("add.html", section="inventory")
+
+
+@app.route("/log-service/<int:item_id>", methods=["GET", "POST"])
+@login_required
+def log_service(item_id):
+    """Log a service was completed for a service type item."""
+    conn = get_db()
+    item = conn.execute(
+        "SELECT * FROM inventory WHERE id = ?", (item_id,)
+    ).fetchone()
+
+    if not item:
+        conn.close()
+        return redirect(url_for("home"))
+
+    if request.method == "POST":
+        service_date = request.form.get(
+            "service_date", str(date.today())
+        ).strip()
+        cost  = request.form.get("cost", "").strip()
+        notes = request.form.get("notes", "").strip()
+
+        # Update last service date on inventory item
         conn.execute("""
-            INSERT INTO inventory
-            (name, category, current_stock, regular_stock,
-             unit, renewal_date, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            UPDATE inventory
+            SET last_service_date = ?
+            WHERE id = ?
+        """, (service_date, item_id))
+
+        # Log the service in service_log table
+        conn.execute("""
+            INSERT INTO service_log
+            (inventory_id, service_date, cost, notes)
+            VALUES (?, ?, ?, ?)
         """, (
-            name, category, float(current_stock),
-            float(regular_stock), unit,
-            renewal_date or None, notes or None
+            item_id, service_date,
+            float(cost) if cost else None,
+            notes or None
         ))
+
+        # If cost provided add to expenses too
+        if cost:
+            conn.execute("""
+                INSERT INTO expenses
+                (title, amount, category, date, notes)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                f"{item['name']} service",
+                float(cost),
+                item["category"],
+                service_date,
+                notes or None
+            ))
+
         conn.commit()
         conn.close()
 
         send_telegram(
-            f"✅ <b>New Inventory Item Added</b>\n\n"
-            f"📦 <b>{name}</b>\n"
-            f"Category: {category}\n"
-            f"Stock: {current_stock} / {regular_stock} {unit}"
-            + (f"\nRenewal: {renewal_date}" if renewal_date else "")
+            f"🔧 <b>Service Logged</b>\n\n"
+            f"⚙️ <b>{item['name']}</b>\n"
+            f"Date: {service_date}"
+            + (f"\nCost: ${float(cost):.2f}" if cost else "")
         )
 
         return redirect(url_for("home"))
 
-    return render_template("add.html", section="inventory")
+    # Get service history
+    history = conn.execute("""
+        SELECT * FROM service_log
+        WHERE inventory_id = ?
+        ORDER BY service_date DESC
+        LIMIT 10
+    """, (item_id,)).fetchall()
+
+    conn.close()
+
+    return render_template(
+        "log_service.html",
+        item=item,
+        history=history
+    )
 
 
 @app.route("/add-expense", methods=["GET", "POST"])
@@ -640,55 +942,67 @@ def add_reminder():
 @login_required
 def edit_inventory(item_id):
     conn = get_db()
+    item = conn.execute(
+        "SELECT * FROM inventory WHERE id = ?", (item_id,)
+    ).fetchone()
+
+    if not item:
+        conn.close()
+        return redirect(url_for("home"))
 
     if request.method == "POST":
-        name          = request.form.get("name", "").strip()
-        category      = request.form.get("category", "").strip()
-        current_stock = request.form.get("current_stock", 0)
-        regular_stock = request.form.get("regular_stock", 0)
-        unit          = request.form.get("unit", "").strip()
-        renewal_date  = request.form.get("renewal_date", "").strip()
-        notes         = request.form.get("notes", "").strip()
+        name     = request.form.get("name", "").strip()
+        category = request.form.get("category", "").strip()
+        notes    = request.form.get("notes", "").strip()
 
-        if not name or not category or not unit:
-            item = conn.execute(
-                "SELECT * FROM inventory WHERE id = ?", (item_id,)
-            ).fetchone()
-            conn.close()
-            return render_template(
-                "edit.html", item=item, section="inventory",
-                error="Name, category, and unit are required."
-            )
+        if item["item_type"] == "quantifiable":
+            current_stock = request.form.get("current_stock", 0)
+            regular_stock = request.form.get("regular_stock", 0)
+            unit          = request.form.get("unit", "").strip()
+            renewal_date  = request.form.get("renewal_date", "").strip()
 
-        conn.execute("""
-            UPDATE inventory
-            SET name=?, category=?, current_stock=?,
-                regular_stock=?, unit=?, renewal_date=?, notes=?
-            WHERE id=?
-        """, (
-            name, category, float(current_stock),
-            float(regular_stock), unit,
-            renewal_date or None, notes or None, item_id
-        ))
+            conn.execute("""
+                UPDATE inventory
+                SET name=?, category=?, current_stock=?,
+                    regular_stock=?, unit=?, renewal_date=?, notes=?
+                WHERE id=?
+            """, (
+                name, category, float(current_stock),
+                float(regular_stock), unit,
+                renewal_date or None, notes or None, item_id
+            ))
+
+        else:  # service
+            last_service_date = request.form.get(
+                "last_service_date", ""
+            ).strip()
+            frequency_days = request.form.get("frequency_days", 30)
+            avg_cost       = request.form.get("avg_cost", "").strip()
+
+            conn.execute("""
+                UPDATE inventory
+                SET name=?, category=?, last_service_date=?,
+                    frequency_days=?, avg_cost=?, notes=?
+                WHERE id=?
+            """, (
+                name, category,
+                last_service_date or None,
+                int(frequency_days),
+                float(avg_cost) if avg_cost else None,
+                notes or None, item_id
+            ))
+
         conn.commit()
         conn.close()
 
         send_telegram(
             f"✏️ <b>Inventory Item Updated</b>\n\n"
-            f"📦 <b>{name}</b>\n"
-            f"Stock: {current_stock} / {regular_stock} {unit}"
+            f"<b>{name}</b> has been updated"
         )
 
         return redirect(url_for("home"))
 
-    item = conn.execute(
-        "SELECT * FROM inventory WHERE id = ?", (item_id,)
-    ).fetchone()
     conn.close()
-
-    if not item:
-        return redirect(url_for("home"))
-
     return render_template(
         "edit.html", item=item, section="inventory"
     )
@@ -730,8 +1044,7 @@ def edit_expense(item_id):
         send_telegram(
             f"✏️ <b>Expense Updated</b>\n\n"
             f"📝 <b>{title}</b>\n"
-            f"Amount: <b>${float(amount):.2f}</b>\n"
-            f"Date: {exp_date}"
+            f"Amount: <b>${float(amount):.2f}</b>"
         )
 
         return redirect(url_for("home"))
@@ -787,8 +1100,7 @@ def edit_reminder(item_id):
         send_telegram(
             f"✏️ <b>Reminder Updated</b>\n\n"
             f"{emoji} <b>{title}</b>\n"
-            f"Due: {due_date}\n"
-            f"Priority: {priority.capitalize()}"
+            f"Due: {due_date}"
         )
 
         return redirect(url_for("home"))
@@ -883,7 +1195,7 @@ def update_stock(item_id):
     conn.commit()
     conn.close()
 
-    if item and item["regular_stock"] > 0:
+    if item and item["regular_stock"] and item["regular_stock"] > 0:
         new_pct = (float(new_stock) / item["regular_stock"]) * 100
         old_pct = (
             item["current_stock"] / item["regular_stock"]
@@ -939,7 +1251,8 @@ def analytics():
     monthly_totals = list(reversed(monthly_totals))
 
     inventory = conn.execute(
-        "SELECT * FROM inventory ORDER BY name"
+        "SELECT * FROM inventory WHERE item_type = 'quantifiable'"
+        " ORDER BY name"
     ).fetchall()
 
     total_reminders = conn.execute(
@@ -992,7 +1305,7 @@ def analytics():
 
     stock_pct = []
     for item in inventory:
-        if item["regular_stock"] > 0:
+        if item["regular_stock"] and item["regular_stock"] > 0:
             pct = (
                 item["current_stock"] / item["regular_stock"]
             ) * 100

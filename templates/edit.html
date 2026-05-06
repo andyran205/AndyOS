@@ -5,7 +5,12 @@
 <div class="page-header">
     <div>
         <div class="page-title">
-            {% if section == "inventory" %}Edit Inventory Item
+            {% if section == "inventory" %}
+                {% if item.item_type == "service" %}
+                    Edit Service Item
+                {% else %}
+                    Edit Inventory Item
+                {% endif %}
             {% elif section == "expense" %}Edit Expense
             {% elif section == "reminder" %}Edit Reminder
             {% endif %}
@@ -19,7 +24,9 @@
 <div class="alert alert-danger">{{ error }}</div>
 {% endif %}
 
-{% if section == "inventory" %}
+
+<!-- EDIT QUANTIFIABLE INVENTORY -->
+{% if section == "inventory" and item.item_type == "quantifiable" %}
 <div class="card" style="max-width:600px;">
     <form action="/edit-inventory/{{ item.id }}" method="POST">
         <div class="grid-2">
@@ -32,7 +39,8 @@
                 <label>Category *</label>
                 <select name="category" required>
                     <option value="">Select category...</option>
-                    {% for cat in ["Food","Utilities","Cleaning","Pet","Medicine","Other"] %}
+                    {% for cat in ["Food","Utilities","Cleaning",
+                                   "Pet","Medicine","Other"] %}
                     <option value="{{ cat }}"
                         {% if item.category == cat %}selected{% endif %}>
                         {{ cat }}
@@ -67,16 +75,80 @@
         </div>
         <div class="form-group">
             <label>Notes</label>
-            <textarea name="notes" rows="3">{{ item.notes or '' }}</textarea>
+            <textarea name="notes"
+                      rows="3">{{ item.notes or '' }}</textarea>
         </div>
         <div style="display:flex; gap:1rem;">
-            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <button type="submit" class="btn btn-primary">
+                Save Changes
+            </button>
             <a href="/" class="btn btn-danger">Cancel</a>
         </div>
     </form>
 </div>
 {% endif %}
 
+
+<!-- EDIT SERVICE INVENTORY -->
+{% if section == "inventory" and item.item_type == "service" %}
+<div class="card" style="max-width:600px;">
+    <form action="/edit-inventory/{{ item.id }}" method="POST">
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Service Name *</label>
+                <input type="text" name="name"
+                       value="{{ item.name }}" required>
+            </div>
+            <div class="form-group">
+                <label>Category *</label>
+                <select name="category" required>
+                    <option value="">Select category...</option>
+                    {% for cat in ["Utilities","Cleaning",
+                                   "Maintenance","Pet","Other"] %}
+                    <option value="{{ cat }}"
+                        {% if item.category == cat %}selected{% endif %}>
+                        {{ cat }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Last Service Date</label>
+                <input type="date" name="last_service_date"
+                       value="{{ item.last_service_date or '' }}">
+            </div>
+            <div class="form-group">
+                <label>How Often (days) *</label>
+                <input type="number" name="frequency_days"
+                       value="{{ item.frequency_days or 30 }}"
+                       min="1">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Average Cost ($)</label>
+            <input type="number" name="avg_cost"
+                   value="{{ item.avg_cost or '' }}"
+                   step="0.01" min="0">
+        </div>
+        <div class="form-group">
+            <label>Notes</label>
+            <textarea name="notes"
+                      rows="3">{{ item.notes or '' }}</textarea>
+        </div>
+        <div style="display:flex; gap:1rem;">
+            <button type="submit" class="btn btn-primary">
+                Save Changes
+            </button>
+            <a href="/" class="btn btn-danger">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endif %}
+
+
+<!-- EDIT EXPENSE -->
 {% if section == "expense" %}
 <div class="card" style="max-width:600px;">
     <form action="/edit-expense/{{ item.id }}" method="POST">
@@ -90,7 +162,9 @@
                 <label>Category *</label>
                 <select name="category" required>
                     <option value="">Select category...</option>
-                    {% for cat in ["Utilities","Groceries","Rent","Internet","Pet","Other"] %}
+                    {% for cat in ["Utilities","Groceries","Rent",
+                                   "Internet","Maintenance",
+                                   "Pet","Other"] %}
                     <option value="{{ cat }}"
                         {% if item.category == cat %}selected{% endif %}>
                         {{ cat }}
@@ -114,16 +188,21 @@
         </div>
         <div class="form-group">
             <label>Notes</label>
-            <textarea name="notes" rows="3">{{ item.notes or '' }}</textarea>
+            <textarea name="notes"
+                      rows="3">{{ item.notes or '' }}</textarea>
         </div>
         <div style="display:flex; gap:1rem;">
-            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <button type="submit" class="btn btn-primary">
+                Save Changes
+            </button>
             <a href="/" class="btn btn-danger">Cancel</a>
         </div>
     </form>
 </div>
 {% endif %}
 
+
+<!-- EDIT REMINDER -->
 {% if section == "reminder" %}
 <div class="card" style="max-width:600px;">
     <form action="/edit-reminder/{{ item.id }}" method="POST">
@@ -152,10 +231,13 @@
         </div>
         <div class="form-group">
             <label>Notes</label>
-            <textarea name="notes" rows="3">{{ item.notes or '' }}</textarea>
+            <textarea name="notes"
+                      rows="3">{{ item.notes or '' }}</textarea>
         </div>
         <div style="display:flex; gap:1rem;">
-            <button type="submit" class="btn btn-primary">Save Changes</button>
+            <button type="submit" class="btn btn-primary">
+                Save Changes
+            </button>
             <a href="/" class="btn btn-danger">Cancel</a>
         </div>
     </form>

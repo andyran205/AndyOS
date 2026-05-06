@@ -19,9 +19,40 @@
 <div class="alert alert-danger">{{ error }}</div>
 {% endif %}
 
+
+<!-- INVENTORY FORM -->
 {% if section == "inventory" %}
-<div class="card" style="max-width:600px;">
-    <form action="/add" method="POST">
+<div class="card" style="max-width:650px;">
+
+    <!-- TYPE SELECTOR -->
+    <div style="display:flex; gap:1rem; margin-bottom:1.5rem;">
+        <button type="button" id="btn-quantifiable"
+                onclick="switchType('quantifiable')"
+                class="btn btn-primary"
+                style="flex:1; padding:0.8rem;">
+            📦 Quantifiable
+            <div style="font-size:0.75rem; margin-top:0.3rem;
+                        opacity:0.8;">
+                Gas, Food, Internet data
+            </div>
+        </button>
+        <button type="button" id="btn-service"
+                onclick="switchType('service')"
+                class="btn btn-primary"
+                style="flex:1; padding:0.8rem;
+                       background-color:#2a2d3e; color:#9099b0;">
+            🔧 Service Based
+            <div style="font-size:0.75rem; margin-top:0.3rem;
+                        opacity:0.8;">
+                Water bill, Septic, Cleaning
+            </div>
+        </button>
+    </div>
+
+    <!-- QUANTIFIABLE FORM -->
+    <form id="form-quantifiable" action="/add" method="POST">
+        <input type="hidden" name="item_type" value="quantifiable">
+
         <div class="grid-2">
             <div class="form-group">
                 <label>Item Name *</label>
@@ -41,37 +72,116 @@
                 </select>
             </div>
         </div>
+
         <div class="grid-3">
             <div class="form-group">
                 <label>Current Stock *</label>
                 <input type="number" name="current_stock"
-                       placeholder="e.g. 5" step="0.1" min="0" required>
+                       placeholder="e.g. 5"
+                       step="0.1" min="0" required>
             </div>
             <div class="form-group">
                 <label>Regular/Full Stock *</label>
                 <input type="number" name="regular_stock"
-                       placeholder="e.g. 20" step="0.1" min="0" required>
+                       placeholder="e.g. 20"
+                       step="0.1" min="0" required>
             </div>
             <div class="form-group">
                 <label>Unit *</label>
                 <input type="text" name="unit"
-                       placeholder="kg / L / bags / pcs" required>
+                       placeholder="kg / L / bags">
             </div>
         </div>
+
         <div class="form-group">
             <label>Renewal / Expiry Date</label>
             <input type="date" name="renewal_date">
         </div>
+
         <div class="form-group">
             <label>Notes</label>
             <textarea name="notes" rows="3"
                       placeholder="Any extra info..."></textarea>
         </div>
-        <button type="submit" class="btn btn-primary">Save Item</button>
+
+        <button type="submit" class="btn btn-primary">
+            Save Item
+        </button>
     </form>
+
+
+    <!-- SERVICE FORM -->
+    <form id="form-service" action="/add" method="POST"
+          style="display:none;">
+        <input type="hidden" name="item_type" value="service">
+
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Service Name *</label>
+                <input type="text" name="name"
+                       placeholder="e.g. Septic Tank Cleaning">
+            </div>
+            <div class="form-group">
+                <label>Category *</label>
+                <select name="category" required>
+                    <option value="">Select category...</option>
+                    <option value="Utilities">Utilities</option>
+                    <option value="Cleaning">Cleaning</option>
+                    <option value="Maintenance">Maintenance</option>
+                    <option value="Pet">Pet</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Last Service Date</label>
+                <input type="date" name="last_service_date">
+                <div style="font-size:0.75rem; color:#9099b0;
+                            margin-top:0.3rem;">
+                    Leave blank if never done before
+                </div>
+            </div>
+            <div class="form-group">
+                <label>How Often (days) *</label>
+                <input type="number" name="frequency_days"
+                       placeholder="e.g. 90"
+                       min="1" value="30">
+                <div style="font-size:0.75rem; color:#9099b0;
+                            margin-top:0.3rem;">
+                    30 = monthly · 90 = quarterly · 365 = yearly
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Average Cost ($)</label>
+            <input type="number" name="avg_cost"
+                   placeholder="e.g. 150.00"
+                   step="0.01" min="0">
+            <div style="font-size:0.75rem; color:#9099b0;
+                        margin-top:0.3rem;">
+                Optional — used for budget planning
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Notes</label>
+            <textarea name="notes" rows="3"
+                      placeholder="e.g. Call John on 555-1234 to book"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+            Save Service
+        </button>
+    </form>
+
 </div>
 {% endif %}
 
+
+<!-- EXPENSE FORM -->
 {% if section == "expense" %}
 <div class="card" style="max-width:600px;">
     <form action="/add-expense" method="POST">
@@ -79,7 +189,8 @@
             <div class="form-group">
                 <label>Title *</label>
                 <input type="text" name="title"
-                       placeholder="e.g. Monthly electricity bill" required>
+                       placeholder="e.g. Monthly electricity bill"
+                       required>
             </div>
             <div class="form-group">
                 <label>Category *</label>
@@ -89,6 +200,7 @@
                     <option value="Groceries">Groceries</option>
                     <option value="Rent">Rent</option>
                     <option value="Internet">Internet</option>
+                    <option value="Maintenance">Maintenance</option>
                     <option value="Pet">Pet</option>
                     <option value="Other">Other</option>
                 </select>
@@ -98,7 +210,8 @@
             <div class="form-group">
                 <label>Amount ($) *</label>
                 <input type="number" name="amount"
-                       placeholder="0.00" step="0.01" min="0" required>
+                       placeholder="0.00"
+                       step="0.01" min="0" required>
             </div>
             <div class="form-group">
                 <label>Date *</label>
@@ -110,11 +223,15 @@
             <textarea name="notes" rows="3"
                       placeholder="Any extra info..."></textarea>
         </div>
-        <button type="submit" class="btn btn-primary">Save Expense</button>
+        <button type="submit" class="btn btn-primary">
+            Save Expense
+        </button>
     </form>
 </div>
 {% endif %}
 
+
+<!-- REMINDER FORM -->
 {% if section == "reminder" %}
 <div class="card" style="max-width:600px;">
     <form action="/add-reminder" method="POST">
@@ -142,9 +259,37 @@
             <textarea name="notes" rows="3"
                       placeholder="Any extra info..."></textarea>
         </div>
-        <button type="submit" class="btn btn-primary">Save Reminder</button>
+        <button type="submit" class="btn btn-primary">
+            Save Reminder
+        </button>
     </form>
 </div>
 {% endif %}
+
+
+<script>
+function switchType(type) {
+    const qForm = document.getElementById('form-quantifiable');
+    const sForm = document.getElementById('form-service');
+    const qBtn  = document.getElementById('btn-quantifiable');
+    const sBtn  = document.getElementById('btn-service');
+
+    if (type === 'quantifiable') {
+        qForm.style.display = 'block';
+        sForm.style.display = 'none';
+        qBtn.style.backgroundColor = '#4f9eff';
+        qBtn.style.color = '#ffffff';
+        sBtn.style.backgroundColor = '#2a2d3e';
+        sBtn.style.color = '#9099b0';
+    } else {
+        qForm.style.display = 'none';
+        sForm.style.display = 'block';
+        sBtn.style.backgroundColor = '#4f9eff';
+        sBtn.style.color = '#ffffff';
+        qBtn.style.backgroundColor = '#2a2d3e';
+        qBtn.style.color = '#9099b0';
+    }
+}
+</script>
 
 {% endblock %}

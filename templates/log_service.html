@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <div class="page-title">🔧 Log Service</div>
+        <div class="page-subtitle">
+            Record that {{ item.name }} was serviced
+        </div>
+    </div>
+    <a href="/" class="btn btn-primary">← Back to Dashboard</a>
+</div>
+
+<div class="grid-2">
+
+    <!-- LOG FORM -->
+    <div class="card">
+        <div class="card-title">Record New Service</div>
+
+        <form action="/log-service/{{ item.id }}" method="POST">
+
+            <div class="form-group">
+                <label>Service Date *</label>
+                <input type="date" name="service_date"
+                       value="{{ today }}" required>
+            </div>
+
+            <div class="form-group">
+                <label>Cost ($)</label>
+                <input type="number" name="cost"
+                       placeholder="e.g. 150.00"
+                       step="0.01" min="0">
+                <div style="font-size:0.75rem; color:#9099b0;
+                            margin-top:0.3rem;">
+                    If entered this will also be added to your expenses
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Notes</label>
+                <textarea name="notes" rows="3"
+                          placeholder="e.g. Used Company X, next service booked"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                ✓ Save Service Log
+            </button>
+
+        </form>
+    </div>
+
+    <!-- SERVICE HISTORY -->
+    <div class="card">
+        <div class="card-title">Service History</div>
+
+        {% if history %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Cost</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for log in history %}
+            <tr>
+                <td>{{ log.service_date }}</td>
+                <td style="color:#fcc419;">
+                    {% if log.cost %}
+                    ${{ "%.2f" | format(log.cost) }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+                <td style="color:#9099b0; font-size:0.82rem;">
+                    {{ log.notes or "—" }}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        {% else %}
+        <div class="empty-state">
+            No service history yet.<br>
+            Log your first service above.
+        </div>
+        {% endif %}
+
+        <!-- Item info -->
+        <div style="margin-top:1.5rem; padding-top:1rem;
+                    border-top:1px solid #2a2d3e;">
+            <div style="font-size:0.82rem; color:#9099b0;">
+                <div>📋 <b>{{ item.name }}</b></div>
+                <div style="margin-top:0.4rem;">
+                    Frequency: every {{ item.frequency_days }} days
+                </div>
+                {% if item.avg_cost %}
+                <div>
+                    Avg cost: ${{ "%.2f" | format(item.avg_cost) }}
+                </div>
+                {% endif %}
+                {% if item.notes %}
+                <div style="margin-top:0.4rem;">
+                    Notes: {{ item.notes }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}
