@@ -1,1 +1,5 @@
-database.db 
+database.db
+pass.env
+.env
+__pycache__/
+*.pyc
