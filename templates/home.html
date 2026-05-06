@@ -77,14 +77,99 @@
 </div>
 
 
-<!-- MAIN GRID -->
+<!-- ============================================================
+     SEARCH BAR
+============================================================ -->
+<div class="card" style="margin-bottom:1.5rem; padding:1rem 1.5rem;">
+    <div style="display:flex; gap:1rem; align-items:center;
+                flex-wrap:wrap;">
+
+        <!-- Search input -->
+        <div style="flex:1; min-width:200px; position:relative;">
+            <span style="position:absolute; left:0.8rem; top:50%;
+                         transform:translateY(-50%);
+                         color:var(--text-muted); font-size:1rem;">
+                🔍
+            </span>
+            <input type="text" id="global-search"
+                   placeholder="Search anything..."
+                   oninput="runSearch()"
+                   style="padding-left:2.4rem; margin:0;">
+        </div>
+
+        <!-- Section filter -->
+        <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
+            <button class="filter-btn active"
+                    onclick="setSection('all')"
+                    id="sec-all">
+                All
+            </button>
+            <button class="filter-btn"
+                    onclick="setSection('inventory')"
+                    id="sec-inventory">
+                📦 Inventory
+            </button>
+            <button class="filter-btn"
+                    onclick="setSection('services')"
+                    id="sec-services">
+                🔧 Services
+            </button>
+            <button class="filter-btn"
+                    onclick="setSection('expenses')"
+                    id="sec-expenses">
+                💰 Expenses
+            </button>
+            <button class="filter-btn"
+                    onclick="setSection('reminders')"
+                    id="sec-reminders">
+                🔔 Reminders
+            </button>
+        </div>
+
+        <!-- Category filter -->
+        <select id="category-filter"
+                onchange="runSearch()"
+                style="width:auto; min-width:140px; margin:0;">
+            <option value="">All Categories</option>
+            <option value="Food">Food</option>
+            <option value="Utilities">Utilities</option>
+            <option value="Cleaning">Cleaning</option>
+            <option value="Maintenance">Maintenance</option>
+            <option value="Pet">Pet</option>
+            <option value="Medicine">Medicine</option>
+            <option value="Groceries">Groceries</option>
+            <option value="Rent">Rent</option>
+            <option value="Internet">Internet</option>
+            <option value="Other">Other</option>
+        </select>
+
+        <!-- Clear button -->
+        <button onclick="clearSearch()"
+                class="btn btn-primary btn-sm"
+                style="white-space:nowrap;">
+            ✕ Clear
+        </button>
+
+    </div>
+
+    <!-- Search results count -->
+    <div id="search-count"
+         style="font-size:0.78rem; color:var(--text-muted);
+                margin-top:0.6rem; display:none;">
+    </div>
+</div>
+
+
+<!-- ============================================================
+     MAIN GRID
+============================================================ -->
 <div class="grid-2">
 
     <!-- LEFT COLUMN -->
     <div>
 
-        <!-- QUANTIFIABLE INVENTORY -->
-        <div class="card">
+        <!-- INVENTORY SECTION -->
+        <div class="card section-inventory">
             <div style="display:flex; justify-content:space-between;
                         align-items:center; margin-bottom:1rem;">
                 <div class="card-title" style="margin-bottom:0;">
@@ -95,11 +180,22 @@
                 </a>
             </div>
 
+            <div id="no-inventory-results"
+                 class="empty-state"
+                 style="display:none;">
+                No inventory items match your search.
+            </div>
+
             {% if inventory %}
             {% for i in inventory %}
 
-            <div style="margin-bottom:1.4rem; padding-bottom:1.4rem;
-                        border-bottom:1px solid #2a2d3e;">
+            <div class="inventory-item searchable-item"
+                 data-name="{{ i.item.name | lower }}"
+                 data-category="{{ i.item.category | lower }}"
+                 data-section="inventory"
+                 style="margin-bottom:1.4rem;
+                        padding-bottom:1.4rem;
+                        border-bottom:1px solid var(--border);">
 
                 <!-- Name + edit + delete -->
                 <div style="display:flex; justify-content:space-between;
@@ -108,12 +204,14 @@
                         <span style="font-weight:600;">
                             {{ i.item.name }}
                         </span>
-                        <span style="color:#9099b0; font-size:0.75rem;
+                        <span style="color:var(--text-muted);
+                                     font-size:0.75rem;
                                      margin-left:0.5rem;">
                             {{ i.item.category }}
                         </span>
                         {% if i.item.track_mode == "auto" %}
-                        <span style="color:#4f9eff; font-size:0.7rem;
+                        <span style="color:var(--text-brand);
+                                     font-size:0.7rem;
                                      margin-left:0.4rem;">
                             AUTO
                         </span>
@@ -131,7 +229,8 @@
                 </div>
 
                 <!-- Stock info -->
-                <div style="font-size:0.8rem; color:#9099b0;
+                <div style="font-size:0.8rem;
+                            color:var(--text-muted);
                             margin-bottom:0.4rem;">
                     {{ i.current }} / {{ i.item.regular_stock }}
                     {{ i.item.unit }}
@@ -152,7 +251,8 @@
                     {% endif %}
                     {% endif %}
                     {% if i.item.avg_daily_use %}
-                    · {{ i.item.avg_daily_use }} {{ i.item.unit }}/day
+                    · {{ i.item.avg_daily_use }}
+                    {{ i.item.unit }}/day
                     {% endif %}
                 </div>
 
@@ -167,7 +267,7 @@
                     </div>
                 </div>
 
-                <!-- QUICK DEDUCT BUTTONS -->
+                <!-- Quick deduct + refill buttons -->
                 <div style="display:flex; gap:0.4rem;
                             flex-wrap:wrap; align-items:center;">
 
@@ -197,7 +297,6 @@
                     </form>
                     {% endif %}
 
-                    <!-- Custom deduct -->
                     <form action="/deduct/{{ i.item.id }}"
                           method="POST"
                           style="display:flex; gap:0.3rem;">
@@ -206,23 +305,24 @@
                                step="0.1" min="0"
                                style="width:75px;
                                       padding:0.2rem 0.4rem;
-                                      font-size:0.75rem;">
+                                      font-size:0.75rem;
+                                      margin:0;">
                         <button type="submit"
                                 class="btn btn-danger btn-sm">
                             − Use
                         </button>
                     </form>
 
-                    <!-- Refill button -->
                     <form action="/refill/{{ i.item.id }}"
                           method="POST"
                           style="display:flex; gap:0.3rem;">
                         <input type="number" name="custom_amount"
-                               placeholder="refill qty"
+                               placeholder="qty"
                                step="0.1" min="0"
-                               style="width:85px;
+                               style="width:75px;
                                       padding:0.2rem 0.4rem;
-                                      font-size:0.75rem;">
+                                      font-size:0.75rem;
+                                      margin:0;">
                         <button type="submit"
                                 class="btn btn-success btn-sm">
                             🛒 Refill
@@ -242,8 +342,8 @@
         </div>
 
 
-        <!-- SERVICES -->
-        <div class="card">
+        <!-- SERVICES SECTION -->
+        <div class="card section-services">
             <div style="display:flex; justify-content:space-between;
                         align-items:center; margin-bottom:1rem;">
                 <div class="card-title" style="margin-bottom:0;">
@@ -254,10 +354,21 @@
                 </a>
             </div>
 
+            <div id="no-services-results"
+                 class="empty-state"
+                 style="display:none;">
+                No services match your search.
+            </div>
+
             {% if services %}
             {% for svc, status in services %}
-            <div style="margin-bottom:1.2rem; padding-bottom:1.2rem;
-                        border-bottom:1px solid #2a2d3e;">
+            <div class="service-item searchable-item"
+                 data-name="{{ svc.name | lower }}"
+                 data-category="{{ svc.category | lower }}"
+                 data-section="services"
+                 style="margin-bottom:1.2rem;
+                        padding-bottom:1.2rem;
+                        border-bottom:1px solid var(--border);">
 
                 <div style="display:flex; justify-content:space-between;
                             align-items:center; margin-bottom:0.5rem;">
@@ -265,7 +376,8 @@
                         <span style="font-weight:600;">
                             {{ svc.name }}
                         </span>
-                        <span style="color:#9099b0; font-size:0.78rem;
+                        <span style="color:var(--text-muted);
+                                     font-size:0.78rem;
                                      margin-left:0.5rem;">
                             {{ svc.category }}
                         </span>
@@ -285,7 +397,8 @@
                     </div>
                 </div>
 
-                <div style="font-size:0.8rem; color:#9099b0;
+                <div style="font-size:0.8rem;
+                            color:var(--text-muted);
                             margin-bottom:0.5rem;">
                     {% if svc.last_service_date %}
                     Last: {{ svc.last_service_date }}
@@ -294,44 +407,25 @@
                     · Avg ${{ "%.2f" | format(svc.avg_cost) }}
                     {% endif %}
                     {% else %}
-                    Never serviced · Every {{ svc.frequency_days }} days
+                    Never serviced
+                    · Every {{ svc.frequency_days }} days
                     {% endif %}
                 </div>
 
                 {% if status.status == "overdue" %}
-                <div style="display:inline-block;
-                            padding:0.3rem 0.8rem;
-                            background:rgba(255,107,107,0.15);
-                            border:1px solid rgba(255,107,107,0.4);
-                            border-radius:6px; font-size:0.8rem;
-                            color:#ff6b6b;">
+                <div class="status-badge status-overdue">
                     ❌ {{ status.days_overdue }} days overdue
                 </div>
                 {% elif status.status == "due-soon" %}
-                <div style="display:inline-block;
-                            padding:0.3rem 0.8rem;
-                            background:rgba(252,196,25,0.15);
-                            border:1px solid rgba(252,196,25,0.4);
-                            border-radius:6px; font-size:0.8rem;
-                            color:#fcc419;">
+                <div class="status-badge status-due-soon">
                     ⚠️ Due soon — {{ status.next_due }}
                 </div>
                 {% elif status.status == "ok" %}
-                <div style="display:inline-block;
-                            padding:0.3rem 0.8rem;
-                            background:rgba(81,207,102,0.15);
-                            border:1px solid rgba(81,207,102,0.4);
-                            border-radius:6px; font-size:0.8rem;
-                            color:#51cf66;">
+                <div class="status-badge status-ok">
                     ✅ Next due: {{ status.next_due }}
                 </div>
                 {% else %}
-                <div style="display:inline-block;
-                            padding:0.3rem 0.8rem;
-                            background:rgba(144,153,176,0.15);
-                            border:1px solid rgba(144,153,176,0.3);
-                            border-radius:6px; font-size:0.8rem;
-                            color:#9099b0;">
+                <div class="status-badge status-unknown">
                     📅 Set last service date to track
                 </div>
                 {% endif %}
@@ -348,12 +442,14 @@
                     </div>
                 </div>
                 {% endif %}
+
             </div>
             {% endfor %}
 
             {% else %}
             <div class="empty-state">
-                No service items yet. <a href="/add">Add one</a>.
+                No service items yet.
+                <a href="/add">Add one</a>.
             </div>
             {% endif %}
         </div>
@@ -364,27 +460,52 @@
     <!-- RIGHT COLUMN -->
     <div>
 
-        <!-- REMINDERS -->
-        <div class="card">
+        <!-- REMINDERS SECTION -->
+        <div class="card section-reminders">
             <div style="display:flex; justify-content:space-between;
                         align-items:center; margin-bottom:1rem;">
                 <div class="card-title" style="margin-bottom:0;">
                     🔔 Reminders
                 </div>
-                <a href="/add-reminder"
-                   class="btn btn-primary btn-sm">+ Add</a>
+                <div style="display:flex; gap:0.4rem;">
+                    <!-- Priority filter -->
+                    <select id="priority-filter"
+                            onchange="runSearch()"
+                            style="width:auto; margin:0;
+                                   font-size:0.78rem;
+                                   padding:0.25rem 0.5rem;">
+                        <option value="">All Priorities</option>
+                        <option value="high">🔴 High</option>
+                        <option value="medium">🟡 Medium</option>
+                        <option value="low">🟢 Low</option>
+                    </select>
+                    <a href="/add-reminder"
+                       class="btn btn-primary btn-sm">+ Add</a>
+                </div>
+            </div>
+
+            <div id="no-reminders-results"
+                 class="empty-state"
+                 style="display:none;">
+                No reminders match your search.
             </div>
 
             {% if reminders %}
             {% for r in reminders %}
-            <div style="display:flex; justify-content:space-between;
+            <div class="reminder-item searchable-item"
+                 data-name="{{ r.title | lower }}"
+                 data-category=""
+                 data-priority="{{ r.priority }}"
+                 data-section="reminders"
+                 style="display:flex; justify-content:space-between;
                         align-items:center; padding:0.7rem 0;
-                        border-bottom:1px solid #2a2d3e;">
+                        border-bottom:1px solid var(--border);">
                 <div>
                     <div style="font-weight:500; font-size:0.9rem;">
                         {{ r.title }}
                     </div>
-                    <div style="font-size:0.78rem; color:#9099b0;
+                    <div style="font-size:0.78rem;
+                                color:var(--text-muted);
                                 margin-top:0.2rem;">
                         Due: {{ r.due_date }}
                         <span class="badge badge-{{ r.priority }}"
@@ -406,21 +527,42 @@
                 </div>
             </div>
             {% endfor %}
+
             {% else %}
             <div class="empty-state">No pending reminders.</div>
             {% endif %}
         </div>
 
 
-        <!-- EXPENSES -->
-        <div class="card">
+        <!-- EXPENSES SECTION -->
+        <div class="card section-expenses">
             <div style="display:flex; justify-content:space-between;
                         align-items:center; margin-bottom:1rem;">
                 <div class="card-title" style="margin-bottom:0;">
                     💰 Recent Expenses
                 </div>
-                <a href="/add-expense"
-                   class="btn btn-primary btn-sm">+ Add</a>
+                <div style="display:flex; gap:0.4rem;">
+                    <!-- Amount filter -->
+                    <select id="amount-filter"
+                            onchange="runSearch()"
+                            style="width:auto; margin:0;
+                                   font-size:0.78rem;
+                                   padding:0.25rem 0.5rem;">
+                        <option value="">Any Amount</option>
+                        <option value="0-50">Under $50</option>
+                        <option value="50-200">$50 - $200</option>
+                        <option value="200-500">$200 - $500</option>
+                        <option value="500+">Over $500</option>
+                    </select>
+                    <a href="/add-expense"
+                       class="btn btn-primary btn-sm">+ Add</a>
+                </div>
+            </div>
+
+            <div id="no-expenses-results"
+                 class="empty-state"
+                 style="display:none;">
+                No expenses match your search.
             </div>
 
             {% if expenses %}
@@ -433,19 +575,25 @@
                         <th></th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="expenses-tbody">
                 {% for e in expenses %}
-                <tr>
+                <tr class="expense-item searchable-item"
+                    data-name="{{ e.title | lower }}"
+                    data-category="{{ e.category | lower }}"
+                    data-amount="{{ e.amount }}"
+                    data-section="expenses">
                     <td>
                         {{ e.title }}
-                        <div style="font-size:0.75rem; color:#9099b0;">
+                        <div style="font-size:0.75rem;
+                                    color:var(--text-muted);">
                             {{ e.category }}
                         </div>
                     </td>
                     <td style="color:#fcc419; font-weight:600;">
                         ${{ "%.2f" | format(e.amount) }}
                     </td>
-                    <td style="color:#9099b0; font-size:0.82rem;">
+                    <td style="color:var(--text-muted);
+                               font-size:0.82rem;">
                         {{ e.date }}
                     </td>
                     <td>
@@ -463,6 +611,7 @@
                 {% endfor %}
                 </tbody>
             </table>
+
             {% else %}
             <div class="empty-state">No expenses recorded yet.</div>
             {% endif %}
@@ -470,5 +619,206 @@
 
     </div>
 </div>
+
+
+<!-- ============================================================
+     SEARCH JAVASCRIPT
+============================================================ -->
+<script>
+
+let currentSection = 'all';
+
+// ── Set which section to show ────────────────────────────────
+function setSection(section) {
+    currentSection = section;
+
+    // Update button styles
+    const sections = ['all','inventory','services',
+                      'expenses','reminders'];
+    sections.forEach(s => {
+        const btn = document.getElementById('sec-' + s);
+        if (btn) {
+            btn.classList.toggle('active', s === section);
+        }
+    });
+
+    // Show/hide whole card sections
+    const cards = {
+        inventory : document.querySelectorAll('.section-inventory'),
+        services  : document.querySelectorAll('.section-services'),
+        expenses  : document.querySelectorAll('.section-expenses'),
+        reminders : document.querySelectorAll('.section-reminders'),
+    };
+
+    Object.keys(cards).forEach(key => {
+        cards[key].forEach(card => {
+            if (section === 'all' || section === key) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    });
+
+    runSearch();
+}
+
+
+// ── Main search function ─────────────────────────────────────
+function runSearch() {
+    const query    = document.getElementById('global-search')
+                             .value.toLowerCase().trim();
+    const category = document.getElementById('category-filter')
+                             .value.toLowerCase();
+    const priority = document.getElementById('priority-filter')
+                             .value.toLowerCase();
+    const amount   = document.getElementById('amount-filter')
+                             .value;
+
+    const items = document.querySelectorAll('.searchable-item');
+    let counts  = {
+        inventory : 0,
+        services  : 0,
+        expenses  : 0,
+        reminders : 0,
+        total     : 0
+    };
+
+    items.forEach(item => {
+        const name     = item.dataset.name     || '';
+        const cat      = item.dataset.category || '';
+        const section  = item.dataset.section  || '';
+        const prio     = item.dataset.priority || '';
+        const amt      = parseFloat(item.dataset.amount) || 0;
+
+        let show = true;
+
+        // Text search
+        if (query && !name.includes(query) && !cat.includes(query)) {
+            show = false;
+        }
+
+        // Category filter
+        if (category && !cat.includes(category)) {
+            show = false;
+        }
+
+        // Priority filter (reminders only)
+        if (priority && section === 'reminders' &&
+            prio !== priority) {
+            show = false;
+        }
+
+        // Amount filter (expenses only)
+        if (amount && section === 'expenses') {
+            if (amount === '0-50'    && amt >= 50)  show = false;
+            if (amount === '50-200'  && (amt < 50  || amt >= 200)) show = false;
+            if (amount === '200-500' && (amt < 200 || amt >= 500)) show = false;
+            if (amount === '500+'    && amt < 500)  show = false;
+        }
+
+        // Section filter
+        if (currentSection !== 'all' &&
+            section !== currentSection) {
+            show = false;
+        }
+
+        // Show or hide
+        item.style.display = show ? '' : 'none';
+
+        if (show) {
+            counts[section]++;
+            counts.total++;
+        }
+    });
+
+    // Show "no results" messages
+    showNoResults('inventory', counts.inventory);
+    showNoResults('services',  counts.services);
+    showNoResults('expenses',  counts.expenses);
+    showNoResults('reminders', counts.reminders);
+
+    // Update search count display
+    const countEl = document.getElementById('search-count');
+    if (query || category || priority || amount) {
+        countEl.style.display = 'block';
+        countEl.textContent   =
+            `Found ${counts.total} result${counts.total !== 1 ? 's' : ''}`;
+    } else {
+        countEl.style.display = 'none';
+    }
+}
+
+
+// ── Show no results message for a section ───────────────────
+function showNoResults(section, count) {
+    const el = document.getElementById('no-' + section + '-results');
+    if (!el) return;
+
+    const hasItems = document.querySelectorAll(
+        '.' + section.slice(0,-1) + '-item'
+    ).length > 0 ||
+    document.querySelectorAll(
+        '.searchable-item[data-section="' + section + '"]'
+    ).length > 0;
+
+    el.style.display = (count === 0 && hasItems) ? 'block' : 'none';
+}
+
+
+// ── Clear all search filters ─────────────────────────────────
+function clearSearch() {
+    document.getElementById('global-search').value   = '';
+    document.getElementById('category-filter').value = '';
+    document.getElementById('priority-filter').value = '';
+    document.getElementById('amount-filter').value   = '';
+    currentSection = 'all';
+
+    // Reset section buttons
+    ['all','inventory','services','expenses','reminders']
+    .forEach(s => {
+        const btn = document.getElementById('sec-' + s);
+        if (btn) btn.classList.toggle('active', s === 'all');
+    });
+
+    // Show all sections
+    ['section-inventory','section-services',
+     'section-expenses','section-reminders']
+    .forEach(cls => {
+        document.querySelectorAll('.' + cls).forEach(el => {
+            el.style.display = 'block';
+        });
+    });
+
+    // Show all items
+    document.querySelectorAll('.searchable-item').forEach(el => {
+        el.style.display = '';
+    });
+
+    // Hide no-results messages
+    ['inventory','services','expenses','reminders'].forEach(s => {
+        const el = document.getElementById('no-' + s + '-results');
+        if (el) el.style.display = 'none';
+    });
+
+    document.getElementById('search-count').style.display = 'none';
+}
+
+
+// ── Keyboard shortcut — press / to focus search ──────────────
+document.addEventListener('keydown', function(e) {
+    if (e.key === '/' &&
+        document.activeElement.tagName !== 'INPUT' &&
+        document.activeElement.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+        document.getElementById('global-search').focus();
+    }
+    if (e.key === 'Escape') {
+        clearSearch();
+        document.getElementById('global-search').blur();
+    }
+});
+
+</script>
 
 {% endblock %}

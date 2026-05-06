@@ -7,7 +7,7 @@
     <style>
 
         /* =====================================================
-           CSS VARIABLES — swap these to change the whole theme
+           CSS VARIABLES
         ===================================================== */
 
         [data-theme="dark"] {
@@ -56,8 +56,7 @@
             background-color : var(--bg-main);
             color            : var(--text-main);
             min-height       : 100vh;
-            transition       : background-color 0.3s,
-                               color 0.3s;
+            transition       : background-color 0.3s, color 0.3s;
         }
 
         /* =====================================================
@@ -98,9 +97,9 @@
         }
 
         .nav-links {
-            display   : flex;
-            gap       : 0.5rem;
-            list-style: none;
+            display    : flex;
+            gap        : 0.5rem;
+            list-style : none;
         }
 
         .nav-links a {
@@ -145,7 +144,7 @@
         }
 
         /* =====================================================
-           THEME TOGGLE SWITCH
+           THEME TOGGLE
         ===================================================== */
 
         .theme-toggle {
@@ -155,9 +154,7 @@
             cursor      : pointer;
         }
 
-        .theme-icon {
-            font-size : 1rem;
-        }
+        .theme-icon { font-size: 1rem; }
 
         .toggle-track {
             width            : 44px;
@@ -236,9 +233,7 @@
             color            : #ffffff;
         }
 
-        .btn-primary:hover {
-            opacity : 0.85;
-        }
+        .btn-primary:hover { opacity: 0.85; }
 
         .btn-danger {
             background-color : transparent;
@@ -391,16 +386,13 @@
         }
 
         td {
-            padding       : 0.7rem 0.8rem;
-            border-bottom : 1px solid var(--bg-secondary);
-            vertical-align: middle;
+            padding        : 0.7rem 0.8rem;
+            border-bottom  : 1px solid var(--bg-secondary);
+            vertical-align : middle;
         }
 
         tr:last-child td { border-bottom: none; }
-
-        tr:hover td {
-            background-color : var(--bg-hover);
-        }
+        tr:hover td      { background-color: var(--bg-hover); }
 
         /* =====================================================
            GRID
@@ -495,17 +487,75 @@
             font-size  : 0.9rem;
         }
 
-        .empty-state a {
-            color : var(--text-brand);
+        .empty-state a { color: var(--text-brand); }
+
+        /* =====================================================
+           SEARCH FILTER BUTTONS
+        ===================================================== */
+
+        .filter-btn {
+            padding          : 0.3rem 0.8rem;
+            border-radius    : 6px;
+            border           : 1px solid var(--border);
+            background-color : var(--bg-card);
+            color            : var(--text-muted);
+            font-size        : 0.82rem;
+            cursor           : pointer;
+            transition       : all 0.2s;
+            white-space      : nowrap;
+        }
+
+        .filter-btn:hover {
+            background-color : var(--bg-secondary);
+            color            : var(--text-main);
+        }
+
+        .filter-btn.active {
+            background-color : var(--text-brand);
+            color            : #ffffff;
+            border-color     : var(--text-brand);
         }
 
         /* =====================================================
-           LIGHT THEME SPECIFIC OVERRIDES
+           SERVICE STATUS BADGES
         ===================================================== */
 
-        [data-theme="light"] .btn-primary {
-            color : #ffffff;
+        .status-badge {
+            display       : inline-block;
+            padding       : 0.3rem 0.8rem;
+            border-radius : 6px;
+            font-size     : 0.8rem;
         }
+
+        .status-overdue {
+            background : rgba(255,107,107,0.15);
+            border     : 1px solid rgba(255,107,107,0.4);
+            color      : #ff6b6b;
+        }
+
+        .status-due-soon {
+            background : rgba(252,196,25,0.15);
+            border     : 1px solid rgba(252,196,25,0.4);
+            color      : #fcc419;
+        }
+
+        .status-ok {
+            background : rgba(81,207,102,0.15);
+            border     : 1px solid rgba(81,207,102,0.4);
+            color      : #51cf66;
+        }
+
+        .status-unknown {
+            background : rgba(144,153,176,0.15);
+            border     : 1px solid rgba(144,153,176,0.3);
+            color      : var(--text-muted);
+        }
+
+        /* =====================================================
+           LIGHT THEME OVERRIDES
+        ===================================================== */
+
+        [data-theme="light"] .btn-primary { color: #ffffff; }
 
         [data-theme="light"] nav {
             border-bottom : 1px solid var(--border);
@@ -523,8 +573,8 @@
             .grid-2, .grid-3, .grid-4 {
                 grid-template-columns : 1fr;
             }
-            .container  { padding: 1rem; }
-            .nav-links  { display: none; }
+            .container { padding: 1rem; }
+            .nav-links { display: none; }
         }
 
     </style>
@@ -582,18 +632,16 @@
             const html    = document.documentElement;
             const current = html.getAttribute("data-theme");
             const next    = current === "dark" ? "light" : "dark";
-
             html.setAttribute("data-theme", next);
             localStorage.setItem("andyos-theme", next);
             updateIcon(next);
         }
 
-        // ── Update the moon/sun icons ────────────────────────
+        // ── Update moon/sun icons ────────────────────────────
         function updateIcon(theme) {
             const icon  = document.getElementById("theme-icon");
             const icon2 = document.getElementById("theme-icon-2");
             if (!icon || !icon2) return;
-
             if (theme === "dark") {
                 icon.textContent  = "🌙";
                 icon2.textContent = "☀️";
