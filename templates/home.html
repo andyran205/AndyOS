@@ -14,7 +14,6 @@
 <!-- ALERTS -->
 {% if low_stock or overdue or overdue_services %}
 <div style="margin-bottom:1.5rem;">
-
     {% for svc, status in overdue_services %}
     <div class="alert alert-danger">
         🔧 <strong>Service Overdue:</strong>
@@ -24,12 +23,14 @@
     </div>
     {% endfor %}
 
-    {% for item in low_stock %}
+    {% for i in low_stock %}
     <div class="alert alert-danger">
-        ⚠️ <strong>Low Stock:</strong> {{ item.name }} is at
-        {{ item.current_stock }} {{ item.unit }}
-        ({{ ((item.current_stock / item.regular_stock) * 100)
-            | int }}% remaining)
+        ⚠️ <strong>Low Stock:</strong> {{ i.item.name }}
+        — {{ i.current }} {{ i.item.unit }} left
+        ({{ i.pct }}%)
+        {% if i.days_left is not none %}
+        — runs out in <strong>{{ i.days_left }} days</strong>
+        {% endif %}
     </div>
     {% endfor %}
 
@@ -39,9 +40,9 @@
         was due on {{ r.due_date }}
     </div>
     {% endfor %}
-
 </div>
 {% endif %}
+
 
 <!-- STAT BOXES -->
 <div class="grid-4" style="margin-bottom:1.5rem;">
@@ -95,66 +96,139 @@
             </div>
 
             {% if inventory %}
-            {% for item in inventory %}
-            {% set pct = ((item.current_stock / item.regular_stock)
-                          * 100) | int
-                         if item.regular_stock > 0 else 0 %}
+            {% for i in inventory %}
 
-            <div style="margin-bottom:1.2rem; padding-bottom:1.2rem;
+            <div style="margin-bottom:1.4rem; padding-bottom:1.4rem;
                         border-bottom:1px solid #2a2d3e;">
+
+                <!-- Name + edit + delete -->
                 <div style="display:flex; justify-content:space-between;
-                            align-items:center; margin-bottom:0.5rem;">
+                            align-items:center; margin-bottom:0.4rem;">
                     <div>
                         <span style="font-weight:600;">
-                            {{ item.name }}
+                            {{ i.item.name }}
                         </span>
-                        <span style="color:#9099b0; font-size:0.78rem;
+                        <span style="color:#9099b0; font-size:0.75rem;
                                      margin-left:0.5rem;">
-                            {{ item.category }}
+                            {{ i.item.category }}
                         </span>
+                        {% if i.item.track_mode == "auto" %}
+                        <span style="color:#4f9eff; font-size:0.7rem;
+                                     margin-left:0.4rem;">
+                            AUTO
+                        </span>
+                        {% endif %}
                     </div>
-                    <div style="display:flex; gap:0.4rem;
-                                align-items:center;">
-                        <form action="/update-stock/{{ item.id }}"
-                              method="POST"
-                              style="display:flex; gap:0.3rem;">
-                            <input type="number" name="current_stock"
-                                   value="{{ item.current_stock }}"
-                                   step="0.1" min="0"
-                                   style="width:70px;
-                                          padding:0.2rem 0.4rem;
-                                          font-size:0.78rem;">
-                            <button type="submit"
-                                    class="btn btn-success btn-sm">
-                                ✓
-                            </button>
-                        </form>
-                        <a href="/edit-inventory/{{ item.id }}"
+                    <div style="display:flex; gap:0.4rem;">
+                        <a href="/edit-inventory/{{ i.item.id }}"
                            class="btn btn-primary btn-sm">✎</a>
-                        <a href="/delete/inventory/{{ item.id }}"
+                        <a href="/delete/inventory/{{ i.item.id }}"
                            class="btn btn-danger btn-sm"
                            onclick="return confirm(
-                               'Delete {{ item.name }}?'
+                               'Delete {{ i.item.name }}?'
                            )">✕</a>
                     </div>
                 </div>
 
+                <!-- Stock info -->
                 <div style="font-size:0.8rem; color:#9099b0;
-                            margin-bottom:0.3rem;">
-                    {{ item.current_stock }} /
-                    {{ item.regular_stock }} {{ item.unit }}
-                    {% if item.renewal_date %}
-                    · Renewal: {{ item.renewal_date }}
+                            margin-bottom:0.4rem;">
+                    {{ i.current }} / {{ i.item.regular_stock }}
+                    {{ i.item.unit }}
+                    {% if i.days_left is not none %}
+                    ·
+                    {% if i.days_left <= 3 %}
+                    <span style="color:#ff6b6b; font-weight:600;">
+                        Runs out in {{ i.days_left }} days
+                    </span>
+                    {% elif i.days_left <= 7 %}
+                    <span style="color:#fcc419;">
+                        {{ i.days_left }} days left
+                    </span>
+                    {% else %}
+                    <span style="color:#51cf66;">
+                        {{ i.days_left }} days left
+                    </span>
+                    {% endif %}
+                    {% endif %}
+                    {% if i.item.avg_daily_use %}
+                    · {{ i.item.avg_daily_use }} {{ i.item.unit }}/day
                     {% endif %}
                 </div>
 
-                <div class="progress-bar-bg">
+                <!-- Progress bar -->
+                <div class="progress-bar-bg"
+                     style="margin-bottom:0.6rem;">
                     <div class="progress-bar-fill
-                        {% if pct > 50 %}bar-green
-                        {% elif pct > 25 %}bar-yellow
+                        {% if i.pct > 50 %}bar-green
+                        {% elif i.pct > 25 %}bar-yellow
                         {% else %}bar-red{% endif %}"
-                        style="width:{{ [pct, 100] | min }}%;">
+                        style="width:{{ i.pct }}%;">
                     </div>
+                </div>
+
+                <!-- QUICK DEDUCT BUTTONS -->
+                <div style="display:flex; gap:0.4rem;
+                            flex-wrap:wrap; align-items:center;">
+
+                    {% if i.item.quick_deduct_1 %}
+                    <form action="/deduct/{{ i.item.id }}"
+                          method="POST">
+                        <input type="hidden" name="amount"
+                               value="{{ i.item.quick_deduct_1 }}">
+                        <button type="submit"
+                                class="btn btn-danger btn-sm">
+                            − {{ i.item.quick_deduct_1 }}
+                            {{ i.item.unit }}
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    {% if i.item.quick_deduct_2 %}
+                    <form action="/deduct/{{ i.item.id }}"
+                          method="POST">
+                        <input type="hidden" name="amount"
+                               value="{{ i.item.quick_deduct_2 }}">
+                        <button type="submit"
+                                class="btn btn-danger btn-sm">
+                            − {{ i.item.quick_deduct_2 }}
+                            {{ i.item.unit }}
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    <!-- Custom deduct -->
+                    <form action="/deduct/{{ i.item.id }}"
+                          method="POST"
+                          style="display:flex; gap:0.3rem;">
+                        <input type="number" name="amount"
+                               placeholder="custom"
+                               step="0.1" min="0"
+                               style="width:75px;
+                                      padding:0.2rem 0.4rem;
+                                      font-size:0.75rem;">
+                        <button type="submit"
+                                class="btn btn-danger btn-sm">
+                            − Use
+                        </button>
+                    </form>
+
+                    <!-- Refill button -->
+                    <form action="/refill/{{ i.item.id }}"
+                          method="POST"
+                          style="display:flex; gap:0.3rem;">
+                        <input type="number" name="custom_amount"
+                               placeholder="refill qty"
+                               step="0.1" min="0"
+                               style="width:85px;
+                                      padding:0.2rem 0.4rem;
+                                      font-size:0.75rem;">
+                        <button type="submit"
+                                class="btn btn-success btn-sm">
+                            🛒 Refill
+                        </button>
+                    </form>
+
                 </div>
             </div>
             {% endfor %}
@@ -168,7 +242,7 @@
         </div>
 
 
-        <!-- SERVICE BASED INVENTORY -->
+        <!-- SERVICES -->
         <div class="card">
             <div style="display:flex; justify-content:space-between;
                         align-items:center; margin-bottom:1rem;">
@@ -182,7 +256,6 @@
 
             {% if services %}
             {% for svc, status in services %}
-
             <div style="margin-bottom:1.2rem; padding-bottom:1.2rem;
                         border-bottom:1px solid #2a2d3e;">
 
@@ -200,7 +273,7 @@
                     <div style="display:flex; gap:0.4rem;">
                         <a href="/log-service/{{ svc.id }}"
                            class="btn btn-success btn-sm">
-                            ✓ Log Service
+                            ✓ Log
                         </a>
                         <a href="/edit-inventory/{{ svc.id }}"
                            class="btn btn-primary btn-sm">✎</a>
@@ -212,77 +285,75 @@
                     </div>
                 </div>
 
-                <!-- Status info -->
                 <div style="font-size:0.8rem; color:#9099b0;
                             margin-bottom:0.5rem;">
                     {% if svc.last_service_date %}
-                        Last done: {{ svc.last_service_date }}
-                        · Every {{ svc.frequency_days }} days
-                        {% if svc.avg_cost %}
-                        · Avg cost: ${{ "%.2f" | format(svc.avg_cost) }}
-                        {% endif %}
+                    Last: {{ svc.last_service_date }}
+                    · Every {{ svc.frequency_days }} days
+                    {% if svc.avg_cost %}
+                    · Avg ${{ "%.2f" | format(svc.avg_cost) }}
+                    {% endif %}
                     {% else %}
-                        Never serviced · Every {{ svc.frequency_days }} days
+                    Never serviced · Every {{ svc.frequency_days }} days
                     {% endif %}
                 </div>
 
-                <!-- Next due badge -->
                 {% if status.status == "overdue" %}
-                <div style="display:inline-block; padding:0.3rem 0.8rem;
+                <div style="display:inline-block;
+                            padding:0.3rem 0.8rem;
                             background:rgba(255,107,107,0.15);
                             border:1px solid rgba(255,107,107,0.4);
                             border-radius:6px; font-size:0.8rem;
-                            color:#ff6b6b; margin-bottom:0.5rem;">
+                            color:#ff6b6b;">
                     ❌ {{ status.days_overdue }} days overdue
                 </div>
-
                 {% elif status.status == "due-soon" %}
-                <div style="display:inline-block; padding:0.3rem 0.8rem;
+                <div style="display:inline-block;
+                            padding:0.3rem 0.8rem;
                             background:rgba(252,196,25,0.15);
                             border:1px solid rgba(252,196,25,0.4);
                             border-radius:6px; font-size:0.8rem;
-                            color:#fcc419; margin-bottom:0.5rem;">
+                            color:#fcc419;">
                     ⚠️ Due soon — {{ status.next_due }}
                 </div>
-
                 {% elif status.status == "ok" %}
-                <div style="display:inline-block; padding:0.3rem 0.8rem;
+                <div style="display:inline-block;
+                            padding:0.3rem 0.8rem;
                             background:rgba(81,207,102,0.15);
                             border:1px solid rgba(81,207,102,0.4);
                             border-radius:6px; font-size:0.8rem;
-                            color:#51cf66; margin-bottom:0.5rem;">
+                            color:#51cf66;">
                     ✅ Next due: {{ status.next_due }}
                 </div>
-
                 {% else %}
-                <div style="display:inline-block; padding:0.3rem 0.8rem;
+                <div style="display:inline-block;
+                            padding:0.3rem 0.8rem;
                             background:rgba(144,153,176,0.15);
                             border:1px solid rgba(144,153,176,0.3);
                             border-radius:6px; font-size:0.8rem;
-                            color:#9099b0; margin-bottom:0.5rem;">
+                            color:#9099b0;">
                     📅 Set last service date to track
                 </div>
                 {% endif %}
 
-                <!-- Progress bar showing time used -->
-                {% if status.pct is not none and status.status != "unknown" %}
-                <div class="progress-bar-bg">
+                {% if status.pct is not none
+                      and status.status != "unknown" %}
+                <div class="progress-bar-bg"
+                     style="margin-top:0.5rem;">
                     <div class="progress-bar-fill
                         {% if status.pct < 50 %}bar-green
                         {% elif status.pct < 80 %}bar-yellow
                         {% else %}bar-red{% endif %}"
-                        style="width:{{ [status.pct, 100] | min }}%;">
+                        style="width:{{ [status.pct,100]|min }}%;">
                     </div>
                 </div>
                 {% endif %}
-
             </div>
             {% endfor %}
 
             {% else %}
             <div class="empty-state">
-                No service items yet.
-                <a href="/add">Add one</a>.
+                No service items yet. <a href="/add">Add one</a>.
             </div>
             {% endif %}
         </div>
@@ -335,11 +406,11 @@
                 </div>
             </div>
             {% endfor %}
-
             {% else %}
             <div class="empty-state">No pending reminders.</div>
             {% endif %}
         </div>
+
 
         <!-- EXPENSES -->
         <div class="card">
@@ -392,7 +463,6 @@
                 {% endfor %}
                 </tbody>
             </table>
-
             {% else %}
             <div class="empty-state">No expenses recorded yet.</div>
             {% endif %}

@@ -20,9 +20,8 @@
 {% endif %}
 
 
-<!-- INVENTORY FORM -->
 {% if section == "inventory" %}
-<div class="card" style="max-width:650px;">
+<div class="card" style="max-width:680px;">
 
     <!-- TYPE SELECTOR -->
     <div style="display:flex; gap:1rem; margin-bottom:1.5rem;">
@@ -48,6 +47,7 @@
             </div>
         </button>
     </div>
+
 
     <!-- QUANTIFIABLE FORM -->
     <form id="form-quantifiable" action="/add" method="POST">
@@ -81,7 +81,7 @@
                        step="0.1" min="0" required>
             </div>
             <div class="form-group">
-                <label>Regular/Full Stock *</label>
+                <label>Full/Regular Stock *</label>
                 <input type="number" name="regular_stock"
                        placeholder="e.g. 20"
                        step="0.1" min="0" required>
@@ -90,6 +90,88 @@
                 <label>Unit *</label>
                 <input type="text" name="unit"
                        placeholder="kg / L / bags">
+            </div>
+        </div>
+
+        <!-- TRACKING MODE -->
+        <div style="background:#0f1117; border:1px solid #2a2d3e;
+                    border-radius:10px; padding:1rem;
+                    margin-bottom:1.2rem;">
+            <div style="font-size:0.85rem; font-weight:600;
+                        color:#9099b0; margin-bottom:0.8rem;">
+                📊 HOW DO YOU WANT TO TRACK THIS?
+            </div>
+
+            <div style="display:flex; gap:1rem; margin-bottom:0.8rem;">
+                <label style="display:flex; align-items:center;
+                              gap:0.5rem; cursor:pointer;
+                              color:#e0e0e0;">
+                    <input type="radio" name="track_mode"
+                           value="manual" checked
+                           onchange="toggleTrackMode('manual')">
+                    Manual logging
+                </label>
+                <label style="display:flex; align-items:center;
+                              gap:0.5rem; cursor:pointer;
+                              color:#e0e0e0;">
+                    <input type="radio" name="track_mode"
+                           value="auto"
+                           onchange="toggleTrackMode('auto')">
+                    Auto (set average daily use)
+                </label>
+            </div>
+
+            <div id="manual-mode">
+                <div style="font-size:0.78rem; color:#9099b0;">
+                    ✋ You log each time you use the item
+                    using the quick deduct buttons on the dashboard.
+                </div>
+
+                <!-- Quick deduct buttons setup -->
+                <div class="grid-2" style="margin-top:0.8rem;">
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Quick Deduct Button 1</label>
+                        <input type="number" name="quick_deduct_1"
+                               placeholder="e.g. 0.5"
+                               step="0.1" min="0">
+                        <div style="font-size:0.72rem; color:#9099b0;
+                                    margin-top:0.2rem;">
+                            Creates a one-click deduct button
+                        </div>
+                    </div>
+                    <div class="form-group" style="margin-bottom:0;">
+                        <label>Quick Deduct Button 2</label>
+                        <input type="number" name="quick_deduct_2"
+                               placeholder="e.g. 1"
+                               step="0.1" min="0">
+                        <div style="font-size:0.72rem; color:#9099b0;
+                                    margin-top:0.2rem;">
+                            Creates a second one-click button
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="auto-mode" style="display:none;">
+                <div style="font-size:0.78rem; color:#9099b0;
+                            margin-bottom:0.8rem;">
+                    🤖 Set your average daily use and AndyOS
+                    will automatically calculate stock levels
+                    for you. Perfect for electricity, water, gas.
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>Average Daily Use *</label>
+                    <input type="number" name="avg_daily_use"
+                           id="avg_daily_use_input"
+                           placeholder="e.g. 3.5"
+                           step="0.01" min="0">
+                    <div style="font-size:0.72rem; color:#9099b0;
+                                margin-top:0.3rem;">
+                        How much you use per day on average.
+                        Stock will count down automatically.
+                        Hit Refill when you top up.
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -140,7 +222,7 @@
                 <input type="date" name="last_service_date">
                 <div style="font-size:0.75rem; color:#9099b0;
                             margin-top:0.3rem;">
-                    Leave blank if never done before
+                    Leave blank if never done
                 </div>
             </div>
             <div class="form-group">
@@ -150,7 +232,7 @@
                        min="1" value="30">
                 <div style="font-size:0.75rem; color:#9099b0;
                             margin-top:0.3rem;">
-                    30 = monthly · 90 = quarterly · 365 = yearly
+                    30=monthly · 90=quarterly · 365=yearly
                 </div>
             </div>
         </div>
@@ -160,16 +242,12 @@
             <input type="number" name="avg_cost"
                    placeholder="e.g. 150.00"
                    step="0.01" min="0">
-            <div style="font-size:0.75rem; color:#9099b0;
-                        margin-top:0.3rem;">
-                Optional — used for budget planning
-            </div>
         </div>
 
         <div class="form-group">
             <label>Notes</label>
             <textarea name="notes" rows="3"
-                      placeholder="e.g. Call John on 555-1234 to book"></textarea>
+                      placeholder="e.g. Call John on 555-1234"></textarea>
         </div>
 
         <button type="submit" class="btn btn-primary">
@@ -181,7 +259,6 @@
 {% endif %}
 
 
-<!-- EXPENSE FORM -->
 {% if section == "expense" %}
 <div class="card" style="max-width:600px;">
     <form action="/add-expense" method="POST">
@@ -189,8 +266,7 @@
             <div class="form-group">
                 <label>Title *</label>
                 <input type="text" name="title"
-                       placeholder="e.g. Monthly electricity bill"
-                       required>
+                       placeholder="e.g. Electricity bill" required>
             </div>
             <div class="form-group">
                 <label>Category *</label>
@@ -220,8 +296,7 @@
         </div>
         <div class="form-group">
             <label>Notes</label>
-            <textarea name="notes" rows="3"
-                      placeholder="Any extra info..."></textarea>
+            <textarea name="notes" rows="3"></textarea>
         </div>
         <button type="submit" class="btn btn-primary">
             Save Expense
@@ -231,7 +306,6 @@
 {% endif %}
 
 
-<!-- REMINDER FORM -->
 {% if section == "reminder" %}
 <div class="card" style="max-width:600px;">
     <form action="/add-reminder" method="POST">
@@ -256,8 +330,7 @@
         </div>
         <div class="form-group">
             <label>Notes</label>
-            <textarea name="notes" rows="3"
-                      placeholder="Any extra info..."></textarea>
+            <textarea name="notes" rows="3"></textarea>
         </div>
         <button type="submit" class="btn btn-primary">
             Save Reminder
@@ -288,6 +361,22 @@ function switchType(type) {
         sBtn.style.color = '#ffffff';
         qBtn.style.backgroundColor = '#2a2d3e';
         qBtn.style.color = '#9099b0';
+    }
+}
+
+function toggleTrackMode(mode) {
+    const manualDiv = document.getElementById('manual-mode');
+    const autoDiv   = document.getElementById('auto-mode');
+    const avgInput  = document.getElementById('avg_daily_use_input');
+
+    if (mode === 'auto') {
+        manualDiv.style.display = 'none';
+        autoDiv.style.display   = 'block';
+        if (avgInput) avgInput.required = true;
+    } else {
+        manualDiv.style.display = 'block';
+        autoDiv.style.display   = 'none';
+        if (avgInput) avgInput.required = false;
     }
 }
 </script>
