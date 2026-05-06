@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <div class="page-title">📊 Analytics</div>
+        <div class="page-subtitle">
+            Overview of your spending, stock and reminders
+        </div>
+    </div>
+    <a href="/" class="btn btn-primary">← Dashboard</a>
+</div>
+
+<div class="grid-4" style="margin-bottom:1.5rem;">
+    <div class="stat-box">
+        <div class="stat-label">All Time Spending</div>
+        <div class="stat-value color-yellow">
+            ${{ "%.2f" | format(all_time_total) }}
+        </div>
+        <div class="stat-sub">{{ total_transactions }} transactions</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">This Month</div>
+        <div class="stat-value color-blue">
+            ${{ "%.2f" | format(monthly_this_month) }}
+        </div>
+        <div class="stat-sub">current month total</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Avg Per Transaction</div>
+        <div class="stat-value color-green">
+            ${{ "%.2f" | format(avg_transaction) }}
+        </div>
+        <div class="stat-sub">average spend</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Items Tracked</div>
+        <div class="stat-value color-blue">{{ inventory_count }}</div>
+        <div class="stat-sub">inventory items</div>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:1.5rem;">
+    <div class="card">
+        <div class="card-title">💳 Spending by Category</div>
+        {% if cat_labels %}
+        <canvas id="categoryChart" height="250"></canvas>
+        {% else %}
+        <div class="empty-state">No expense data yet.</div>
+        {% endif %}
+    </div>
+    <div class="card">
+        <div class="card-title">📈 Monthly Spending Trend</div>
+        {% if month_labels %}
+        <canvas id="monthlyChart" height="250"></canvas>
+        {% else %}
+        <div class="empty-state">No expense data yet.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:1.5rem;">
+    <div class="card-title">📅 Daily Spending This Month</div>
+    {% if day_labels %}
+    <canvas id="dailyChart" height="120"></canvas>
+    {% else %}
+    <div class="empty-state">No spending recorded this month.</div>
+    {% endif %}
+</div>
+
+<div class="grid-2" style="margin-bottom:1.5rem;">
+    <div class="card">
+        <div class="card-title">📦 Stock Levels (%)</div>
+        {% if stock_labels %}
+        <canvas id="stockChart" height="250"></canvas>
+        {% else %}
+        <div class="empty-state">No inventory items yet.</div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-title">🔔 Reminder Overview</div>
+        {% if total_reminders > 0 %}
+        <div style="max-width:220px; margin:0 auto 1.5rem;">
+            <canvas id="reminderChart"></canvas>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr;
+                    gap:0.8rem; margin-top:0.5rem;">
+            <div style="background:#1e2130; border-radius:8px;
+                        padding:0.8rem; text-align:center;">
+                <div style="font-size:1.4rem; font-weight:700;
+                            color:#51cf66;">{{ done_reminders }}</div>
+                <div style="font-size:0.75rem; color:#9099b0;">Completed</div>
+            </div>
+            <div style="background:#1e2130; border-radius:8px;
+                        padding:0.8rem; text-align:center;">
+                <div style="font-size:1.4rem; font-weight:700;
+                            color:#4f9eff;">{{ pending_reminders }}</div>
+                <div style="font-size:0.75rem; color:#9099b0;">Pending</div>
+            </div>
+            <div style="background:#1e2130; border-radius:8px;
+                        padding:0.8rem; text-align:center;">
+                <div style="font-size:1.4rem; font-weight:700;
+                            color:#ff6b6b;">{{ overdue_reminders }}</div>
+                <div style="font-size:0.75rem; color:#9099b0;">Overdue</div>
+            </div>
+            <div style="background:#1e2130; border-radius:8px;
+                        padding:0.8rem; text-align:center;">
+                <div style="font-size:1.4rem; font-weight:700;
+                            color:#fcc419;">{{ total_reminders }}</div>
+                <div style="font-size:0.75rem; color:#9099b0;">Total Ever</div>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">No reminders recorded yet.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title">💰 Spending Breakdown by Category</div>
+    {% if cat_labels %}
+    <table>
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Total Spent</th>
+                <th>Share</th>
+                <th>Visual</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% set grand_total = cat_values | sum %}
+        {% for i in range(cat_labels | length) %}
+        {% set pct = ((cat_values[i] / grand_total) * 100) | int %}
+        <tr>
+            <td style="font-weight:500;">{{ cat_labels[i] }}</td>
+            <td style="color:#fcc419; font-weight:600;">
+                ${{ "%.2f" | format(cat_values[i]) }}
+            </td>
+            <td style="color:#9099b0;">{{ pct }}%</td>
+            <td style="width:200px;">
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill bar-green"
+                         style="width:{{ pct }}%;"></div>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">No expense data yet.</div>
+    {% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+Chart.defaults.color       = '#9099b0';
+Chart.defaults.borderColor = '#2a2d3e';
+Chart.defaults.font.family = 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif';
+
+const COLORS = [
+    '#4f9eff','#51cf66','#fcc419','#ff6b6b',
+    '#cc5de8','#20c997','#fd7e14','#74c0fc',
+    '#a9e34b','#f783ac'
+];
+
+{% if cat_labels %}
+new Chart(document.getElementById('categoryChart'), {
+    type: 'doughnut',
+    data: {
+        labels  : {{ cat_labels | tojson }},
+        datasets: [{
+            data           : {{ cat_values | tojson }},
+            backgroundColor: COLORS,
+            borderColor    : '#1a1d27',
+            borderWidth    : 3,
+            hoverOffset    : 8
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'right',
+                labels  : { padding: 16, usePointStyle: true }
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(ctx) {
+                        return ' $' + ctx.parsed.toFixed(2);
+                    }
+                }
+            }
+        }
+    }
+});
+{% endif %}
+
+{% if month_labels %}
+new Chart(document.getElementById('monthlyChart'), {
+    type: 'bar',
+    data: {
+        labels  : {{ month_labels | tojson }},
+        datasets: [{
+            label          : 'Monthly Spending ($)',
+            data           : {{ month_values | tojson }},
+            backgroundColor: 'rgba(79,158,255,0.7)',
+            borderColor    : '#4f9eff',
+            borderWidth    : 2,
+            borderRadius   : 6
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(ctx) {
+                        return ' $' + ctx.parsed.y.toFixed(2);
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid       : { color: '#2a2d3e' },
+                ticks      : { callback: function(v) { return '$' + v; } }
+            },
+            x: { grid: { color: '#2a2d3e' } }
+        }
+    }
+});
+{% endif %}
+
+{% if day_labels %}
+new Chart(document.getElementById('dailyChart'), {
+    type: 'line',
+    data: {
+        labels  : {{ day_labels | tojson }},
+        datasets: [{
+            label              : 'Daily Spending ($)',
+            data               : {{ day_values | tojson }},
+            borderColor        : '#51cf66',
+            backgroundColor    : 'rgba(81,207,102,0.1)',
+            borderWidth        : 2,
+            pointBackgroundColor: '#51cf66',
+            pointRadius        : 4,
+            tension            : 0.4,
+            fill               : true
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(ctx) {
+                        return ' $' + ctx.parsed.y.toFixed(2);
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid       : { color: '#2a2d3e' },
+                ticks      : { callback: function(v) { return '$' + v; } }
+            },
+            x: { grid: { color: '#2a2d3e' } }
+        }
+    }
+});
+{% endif %}
+
+{% if stock_labels %}
+new Chart(document.getElementById('stockChart'), {
+    type: 'bar',
+    data: {
+        labels  : {{ stock_labels | tojson }},
+        datasets: [{
+            label          : 'Stock Level (%)',
+            data           : {{ stock_pct | tojson }},
+            backgroundColor: {{ stock_pct | tojson }}.map(function(p) {
+                if (p > 50) return 'rgba(81,207,102,0.8)';
+                if (p > 25) return 'rgba(252,196,25,0.8)';
+                return              'rgba(255,107,107,0.8)';
+            }),
+            borderRadius: 4,
+            borderWidth : 0
+        }]
+    },
+    options: {
+        indexAxis : 'y',
+        responsive: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(ctx) {
+                        return ' ' + ctx.parsed.x + '% remaining';
+                    }
+                }
+            }
+        },
+        scales: {
+            x: {
+                beginAtZero: true,
+                max        : 100,
+                grid       : { color: '#2a2d3e' },
+                ticks      : { callback: function(v) { return v + '%'; } }
+            },
+            y: { grid: { color: '#2a2d3e' } }
+        }
+    }
+});
+{% endif %}
+
+{% if total_reminders > 0 %}
+new Chart(document.getElementById('reminderChart'), {
+    type: 'doughnut',
+    data: {
+        labels  : ['Completed', 'Pending', 'Overdue'],
+        datasets: [{
+            data           : [
+                {{ done_reminders }},
+                {{ pending_reminders - overdue_reminders }},
+                {{ overdue_reminders }}
+            ],
+            backgroundColor: [
+                'rgba(81,207,102,0.8)',
+                'rgba(79,158,255,0.8)',
+                'rgba(255,107,107,0.8)'
+            ],
+            borderColor : '#1a1d27',
+            borderWidth : 3
+        }]
+    },
+    options: {
+        responsive: true,
+        cutout    : '70%',
+        plugins   : {
+            legend: {
+                position: 'bottom',
+                labels  : { padding: 12, usePointStyle: true }
+            }
+        }
+    }
+});
+{% endif %}
+</script>
+
+{% endblock %}

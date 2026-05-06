@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AndyOS — Login</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f1117;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-box {
+            background-color: #1a1d27;
+            border: 1px solid #2a2d3e;
+            border-radius: 16px;
+            padding: 2.5rem;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .login-logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .login-logo h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #4f9eff;
+        }
+
+        .login-logo h1 span {
+            color: #ffffff;
+        }
+
+        .login-logo p {
+            color: #9099b0;
+            font-size: 0.85rem;
+            margin-top: 0.4rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.85rem;
+            color: #9099b0;
+            margin-bottom: 0.4rem;
+        }
+
+        input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background-color: #0f1117;
+            border: 1px solid #2a2d3e;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #4f9eff;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: #4f9eff;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            margin-top: 0.5rem;
+        }
+
+        .btn-login:hover {
+            background-color: #3a8aef;
+        }
+
+        .error-box {
+            background-color: rgba(255, 107, 107, 0.1);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            color: #ff6b6b;
+            padding: 0.8rem 1rem;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            margin-bottom: 1.2rem;
+            text-align: center;
+        }
+
+        .login-footer {
+            text-align: center;
+            margin-top: 1.5rem;
+            font-size: 0.78rem;
+            color: #9099b0;
+        }
+
+        .lock-icon {
+            font-size: 3rem;
+            margin-bottom: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-box">
+
+        <div class="login-logo">
+            <div class="lock-icon">🏠</div>
+            <h1>Andy<span>OS</span></h1>
+            <p>Sign in to access your dashboard</p>
+        </div>
+
+        {% if error %}
+        <div class="error-box">
+            ❌ {{ error }}
+        </div>
+        {% endif %}
+
+        <form action="/login" method="POST">
+
+            <div class="form-group">
+                <label>Username</label>
+                <input
+                    type="text"
+                    name="username"
+                    placeholder="Enter your username"
+                    autocomplete="username"
+                    required
+                >
+            </div>
+
+            <div class="form-group">
+                <label>Password</label>
+                <input
+                    type="password"
+                    name="password"
+                    placeholder="Enter your password"
+                    autocomplete="current-password"
+                    required
+                >
+            </div>
+
+            <button type="submit" class="btn-login">
+                Sign In →
+            </button>
+
+        </form>
+
+        <div class="login-footer">
+            AndyOS — Your Home Operating System
+        </div>
+
+    </div>
+
+</body>
+</html>

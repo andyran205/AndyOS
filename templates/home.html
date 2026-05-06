@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <div class="page-title">Dashboard</div>
+        <div class="page-subtitle">{{ today }} — Welcome to HouseOS</div>
+    </div>
+</div>
+
+{% if low_stock or overdue %}
+<div style="margin-bottom:1.5rem;">
+    {% for item in low_stock %}
+    <div class="alert alert-danger">
+        ⚠️ <strong>Low Stock:</strong> {{ item.name }} is at
+        {{ item.current_stock }} {{ item.unit }}
+        ({{ ((item.current_stock / item.regular_stock) * 100) | int }}% remaining)
+    </div>
+    {% endfor %}
+
+    {% for r in overdue %}
+    <div class="alert alert-warning">
+        🔔 <strong>Overdue:</strong> {{ r.title }} was due on {{ r.due_date }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="grid-4" style="margin-bottom:1.5rem;">
+    <div class="stat-box">
+        <div class="stat-label">Inventory Items</div>
+        <div class="stat-value color-blue">{{ inventory | length }}</div>
+        <div class="stat-sub">items tracked</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Low Stock Alerts</div>
+        <div class="stat-value color-red">{{ low_stock | length }}</div>
+        <div class="stat-sub">need attention</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Monthly Spending</div>
+        <div class="stat-value color-yellow">
+            ${{ "%.2f" | format(monthly_total) }}
+        </div>
+        <div class="stat-sub">this month</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Pending Reminders</div>
+        <div class="stat-value color-green">{{ reminders | length }}</div>
+        <div class="stat-sub">to complete</div>
+    </div>
+</div>
+
+<div class="grid-2">
+
+    <!-- INVENTORY -->
+    <div class="card">
+        <div style="display:flex; justify-content:space-between;
+                    align-items:center; margin-bottom:1rem;">
+            <div class="card-title" style="margin-bottom:0;">📦 Inventory</div>
+            <a href="/add" class="btn btn-primary btn-sm">+ Add Item</a>
+        </div>
+
+        {% if inventory %}
+        {% for item in inventory %}
+        {% set pct = ((item.current_stock / item.regular_stock) * 100) | int
+                     if item.regular_stock > 0 else 0 %}
+
+        <div style="margin-bottom:1.2rem; padding-bottom:1.2rem;
+                    border-bottom:1px solid #2a2d3e;">
+            <div style="display:flex; justify-content:space-between;
+                        align-items:center; margin-bottom:0.5rem;">
+                <div>
+                    <span style="font-weight:600;">{{ item.name }}</span>
+                    <span style="color:#9099b0; font-size:0.78rem;
+                                 margin-left:0.5rem;">{{ item.category }}</span>
+                </div>
+                <div style="display:flex; gap:0.4rem; align-items:center;">
+                    <form action="/update-stock/{{ item.id }}" method="POST"
+                          style="display:flex; gap:0.3rem;">
+                        <input type="number" name="current_stock"
+                               value="{{ item.current_stock }}"
+                               step="0.1" min="0"
+                               style="width:70px; padding:0.2rem 0.4rem;
+                                      font-size:0.78rem;">
+                        <button type="submit"
+                                class="btn btn-success btn-sm">✓</button>
+                    </form>
+                    <a href="/edit-inventory/{{ item.id }}"
+                       class="btn btn-primary btn-sm">✎</a>
+                    <a href="/delete/inventory/{{ item.id }}"
+                       class="btn btn-danger btn-sm"
+                       onclick="return confirm('Delete {{ item.name }}?')">✕</a>
+                </div>
+            </div>
+
+            <div style="font-size:0.8rem; color:#9099b0; margin-bottom:0.3rem;">
+                {{ item.current_stock }} / {{ item.regular_stock }} {{ item.unit }}
+                {% if item.renewal_date %}
+                · Renewal: {{ item.renewal_date }}
+                {% endif %}
+            </div>
+
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill
+                    {% if pct > 50 %}bar-green
+                    {% elif pct > 25 %}bar-yellow
+                    {% else %}bar-red{% endif %}"
+                    style="width:{{ [pct, 100] | min }}%;">
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        {% else %}
+        <div class="empty-state">
+            No inventory items yet. <a href="/add">Add one</a>.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div>
+
+        <!-- REMINDERS -->
+        <div class="card">
+            <div style="display:flex; justify-content:space-between;
+                        align-items:center; margin-bottom:1rem;">
+                <div class="card-title" style="margin-bottom:0;">
+                    🔔 Reminders
+                </div>
+                <a href="/add-reminder"
+                   class="btn btn-primary btn-sm">+ Add</a>
+            </div>
+
+            {% if reminders %}
+            {% for r in reminders %}
+            <div style="display:flex; justify-content:space-between;
+                        align-items:center; padding:0.7rem 0;
+                        border-bottom:1px solid #2a2d3e;">
+                <div>
+                    <div style="font-weight:500; font-size:0.9rem;">
+                        {{ r.title }}
+                    </div>
+                    <div style="font-size:0.78rem; color:#9099b0;
+                                margin-top:0.2rem;">
+                        Due: {{ r.due_date }}
+                        <span class="badge badge-{{ r.priority }}"
+                              style="margin-left:0.4rem;">
+                            {{ r.priority }}
+                        </span>
+                    </div>
+                </div>
+                <div style="display:flex; gap:0.4rem;">
+                    <a href="/complete-reminder/{{ r.id }}"
+                       class="btn btn-success btn-sm">✓ Done</a>
+                    <a href="/edit-reminder/{{ r.id }}"
+                       class="btn btn-primary btn-sm">✎</a>
+                    <a href="/delete/reminders/{{ r.id }}"
+                       class="btn btn-danger btn-sm"
+                       onclick="return confirm('Delete this reminder?')">✕</a>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% else %}
+            <div class="empty-state">No pending reminders.</div>
+            {% endif %}
+        </div>
+
+        <!-- EXPENSES -->
+        <div class="card">
+            <div style="display:flex; justify-content:space-between;
+                        align-items:center; margin-bottom:1rem;">
+                <div class="card-title" style="margin-bottom:0;">
+                    💰 Recent Expenses
+                </div>
+                <a href="/add-expense"
+                   class="btn btn-primary btn-sm">+ Add</a>
+            </div>
+
+            {% if expenses %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for e in expenses %}
+                <tr>
+                    <td>
+                        {{ e.title }}
+                        <div style="font-size:0.75rem; color:#9099b0;">
+                            {{ e.category }}
+                        </div>
+                    </td>
+                    <td style="color:#fcc419; font-weight:600;">
+                        ${{ "%.2f" | format(e.amount) }}
+                    </td>
+                    <td style="color:#9099b0; font-size:0.82rem;">
+                        {{ e.date }}
+                    </td>
+                    <td>
+                        <div style="display:flex; gap:0.4rem;">
+                            <a href="/edit-expense/{{ e.id }}"
+                               class="btn btn-primary btn-sm">✎</a>
+                            <a href="/delete/expenses/{{ e.id }}"
+                               class="btn btn-danger btn-sm"
+                               onclick="return confirm('Delete this expense?')">✕</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+            {% else %}
+            <div class="empty-state">No expenses recorded yet.</div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}
