@@ -98,6 +98,17 @@ def login_required(f):
     return decorated
 
 
+def hash_password(password):
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+
+def get_user_by_username(conn, username):
+    return conn.execute(
+        "SELECT * FROM users WHERE LOWER(username) = LOWER(?)",
+        (username,)
+    ).fetchone()
+
+
 # ============================================================
 # TELEGRAM CONFIG
 # ============================================================
@@ -143,19 +154,30 @@ def get_days_until_empty(current_stock, avg_daily_use):
 
 def get_calculated_stock(item):
     """
-    For items with avg_daily_use set but no manual logging,
-    calculate estimated current stock based on days since
-    last refill and average daily use.
+    For items in auto mode, calculate estimated stock continuously
+    based on hours since last refill and average daily use.
     """
     try:
-        if (item["track_mode"] == "auto" and
-                item["avg_daily_use"] and
-                item["last_refill_date"]):
-            last_refill = datetime.strptime(
-                item["last_refill_date"], "%Y-%m-%d"
-            ).date()
-            days_since  = (date.today() - last_refill).days
-            used        = days_since * float(item["avg_daily_use"])
+        if item["track_mode"] == "auto" and item["avg_daily_use"]:
+            last_refill_raw = (
+                item["last_refill_at"] or item["last_refill_date"]
+            )
+            if not last_refill_raw:
+                return item["current_stock"]
+
+            try:
+                last_refill_dt = datetime.fromisoformat(last_refill_raw)
+            except ValueError:
+                # Backward compatibility for legacy YYYY-MM-DD values.
+                last_refill_dt = datetime.strptime(
+                    item["last_refill_date"], "%Y-%m-%d"
+                )
+
+            elapsed_hours = max(
+                0.0,
+                (datetime.now() - last_refill_dt).total_seconds() / 3600.0
+            )
+            used = elapsed_hours * (float(item["avg_daily_use"]) / 24.0)
             estimated   = float(item["regular_stock"]) - used
             return max(0, round(estimated, 2))
         return item["current_stock"]
@@ -478,6 +500,7 @@ def init_db():
             quick_deduct_1 REAL,
             quick_deduct_2 REAL,
             last_refill_date TEXT,
+            last_refill_at TEXT,
             notes TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
@@ -494,6 +517,7 @@ def init_db():
         ("quick_deduct_1",   "REAL"),
         ("quick_deduct_2",   "REAL"),
         ("last_refill_date", "TEXT"),
+        ("last_refill_at",   "TEXT"),
     ]
 
     for col_name, col_def in new_columns:
@@ -552,6 +576,15 @@ def init_db():
     """)
 
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS alert_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             sent_at TEXT NOT NULL
@@ -563,6 +596,7 @@ def init_db():
     restore_inventory_from_backup_if_empty(conn)
     migrate_electricity_bill_to_quantifiable(conn)
     ensure_default_inventory_items(conn)
+    ensure_default_login_user(conn)
     backup_inventory(conn)
 
     conn.close()
@@ -586,6 +620,7 @@ def _inventory_row_to_dict(row):
         "quick_deduct_1": row["quick_deduct_1"],
         "quick_deduct_2": row["quick_deduct_2"],
         "last_refill_date": row["last_refill_date"],
+        "last_refill_at": row["last_refill_at"],
         "notes": row["notes"],
     }
 
@@ -633,8 +668,8 @@ def restore_inventory_from_backup_if_empty(conn):
                 (name, category, item_type, track_mode, current_stock,
                  regular_stock, unit, renewal_date, last_service_date,
                  frequency_days, avg_cost, avg_daily_use, quick_deduct_1,
-                 quick_deduct_2, last_refill_date, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 quick_deduct_2, last_refill_date, last_refill_at, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 item.get("name"),
                 item.get("category"),
@@ -651,6 +686,7 @@ def restore_inventory_from_backup_if_empty(conn):
                 item.get("quick_deduct_1"),
                 item.get("quick_deduct_2"),
                 item.get("last_refill_date"),
+                item.get("last_refill_at"),
                 item.get("notes"),
             ))
 
@@ -696,8 +732,9 @@ def ensure_default_inventory_items(conn):
                     INSERT INTO inventory
                     (name, category, item_type, track_mode, current_stock,
                      regular_stock, unit, renewal_date, avg_daily_use,
-                     quick_deduct_1, quick_deduct_2, last_refill_date, notes)
-                    VALUES (?, ?, 'quantifiable', 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     quick_deduct_1, quick_deduct_2, last_refill_date,
+                     last_refill_at, notes)
+                    VALUES (?, ?, 'quantifiable', 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     item["name"],
                     item["category"],
@@ -709,6 +746,7 @@ def ensure_default_inventory_items(conn):
                     None,
                     None,
                     str(date.today()),
+                    datetime.now().isoformat(),
                     "Seeded default item",
                 ))
 
@@ -760,6 +798,22 @@ def migrate_electricity_bill_to_quantifiable(conn):
             )
     except Exception as e:
         print(f"Electricity bill migration failed: {e}")
+
+
+def ensure_default_login_user(conn):
+    try:
+        existing = get_user_by_username(conn, LOGIN_USERNAME)
+        if existing:
+            return
+
+        conn.execute("""
+            INSERT INTO users (username, password_hash)
+            VALUES (?, ?)
+        """, (LOGIN_USERNAME, hash_password(LOGIN_PASSWORD)))
+        conn.commit()
+        print(f"Created default login user: {LOGIN_USERNAME}")
+    except Exception as e:
+        print(f"Default login user setup failed: {e}")
 
 
 # ============================================================
@@ -879,12 +933,29 @@ def login():
         return redirect(url_for("home"))
 
     error = None
+    info = None
+
+    if request.args.get("created") == "1":
+        info = "Account created. You can sign in now."
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
 
-        if username == LOGIN_USERNAME and password == LOGIN_PASSWORD:
+        conn = get_db()
+        user = get_user_by_username(conn, username)
+        conn.close()
+
+        valid_user = (
+            user is not None and
+            user["password_hash"] == hash_password(password)
+        )
+
+        # Backward-compatible fallback for older env-based login.
+        if not valid_user and username == LOGIN_USERNAME and password == LOGIN_PASSWORD:
+            valid_user = True
+
+        if valid_user:
             session["logged_in"] = True
             session["username"]  = username
 
@@ -898,7 +969,64 @@ def login():
         else:
             error = "Wrong username or password. Try again."
 
-    return render_template("login.html", error=error)
+    return render_template("login.html", error=error, info=info)
+
+
+@app.route("/signup", methods=["POST"])
+def signup():
+    if is_logged_in():
+        return redirect(url_for("home"))
+
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
+    password_confirm = request.form.get(
+        "password_confirm", ""
+    ).strip()
+
+    if not username or not password:
+        return render_template(
+            "login.html",
+            error="Username and password are required."
+        )
+    if len(username) < 3:
+        return render_template(
+            "login.html",
+            error="Username must be at least 3 characters."
+        )
+    if len(password) < 6:
+        return render_template(
+            "login.html",
+            error="Password must be at least 6 characters."
+        )
+    if password != password_confirm:
+        return render_template(
+            "login.html",
+            error="Passwords do not match."
+        )
+
+    conn = get_db()
+    existing = get_user_by_username(conn, username)
+    if existing:
+        conn.close()
+        return render_template(
+            "login.html",
+            error="Username already exists. Choose another one."
+        )
+
+    conn.execute("""
+        INSERT INTO users (username, password_hash)
+        VALUES (?, ?)
+    """, (username, hash_password(password)))
+    conn.commit()
+    conn.close()
+
+    send_telegram(
+        f"🆕 <b>New AndyOS Account</b>\n"
+        f"User <b>{username}</b> created\n"
+        f"🕐 {datetime.now().strftime('%H:%M on %d %b %Y')}"
+    )
+
+    return redirect(url_for("login", created="1"))
 
 
 @app.route("/logout")
@@ -1086,9 +1214,15 @@ def refill_stock(item_id):
         conn.execute("""
             UPDATE inventory
             SET current_stock = ?,
-                last_refill_date = ?
+                last_refill_date = ?,
+                last_refill_at = ?
             WHERE id = ?
-        """, (new_stock, str(date.today()), item_id))
+        """, (
+            new_stock,
+            str(date.today()),
+            datetime.now().isoformat(),
+            item_id
+        ))
 
         conn.commit()
         backup_inventory(conn)
@@ -1149,8 +1283,8 @@ def add_item():
                  current_stock, regular_stock, unit,
                  renewal_date, avg_daily_use,
                  quick_deduct_1, quick_deduct_2,
-                 last_refill_date, notes)
-                VALUES (?, ?, 'quantifiable', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 last_refill_date, last_refill_at, notes)
+                VALUES (?, ?, 'quantifiable', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 name, category, track_mode,
                 float(current_stock), float(regular_stock),
@@ -1159,6 +1293,7 @@ def add_item():
                 float(quick_deduct_1) if quick_deduct_1 else None,
                 float(quick_deduct_2) if quick_deduct_2 else None,
                 str(date.today()),
+                datetime.now().isoformat(),
                 notes or None
             ))
 
