@@ -379,7 +379,7 @@ def build_daily_briefing():
     ).fetchone()[0] or 0
 
     lines.append("💰 <b>Spending This Month:</b>")
-    lines.append(f"  • Total: ${monthly_total:.2f}")
+    lines.append(f"  • Total: GHS {monthly_total:.2f}")
     lines.append(f"  • Transactions: {expense_count}")
     lines.append("")
     lines.append(
@@ -1194,7 +1194,7 @@ def log_service(item_id):
             f"🔧 <b>Service Logged</b>\n\n"
             f"⚙️ <b>{item['name']}</b>\n"
             f"Date: {service_date}"
-            + (f"\nCost: ${float(cost):.2f}" if cost else "")
+            + (f"\nCost: GHS {float(cost):.2f}" if cost else "")
         )
 
         return redirect(url_for("home"))
@@ -1248,7 +1248,7 @@ def add_expense():
         send_telegram(
             f"💰 <b>New Expense Recorded</b>\n\n"
             f"📝 <b>{title}</b>\n"
-            f"Amount: <b>${float(amount):.2f}</b>\n"
+            f"Amount: <b>GHS {float(amount):.2f}</b>\n"
             f"Category: {category}\n"
             f"Date: {exp_date}"
         )
@@ -1318,6 +1318,9 @@ def edit_inventory(item_id):
         name     = request.form.get("name", "").strip()
         category = request.form.get("category", "").strip()
         notes    = request.form.get("notes", "").strip()
+        expense_amount_raw = request.form.get(
+            "expense_amount", ""
+        ).strip()
 
         if item["item_type"] == "quantifiable":
             current_stock  = request.form.get("current_stock", 0)
@@ -1378,6 +1381,24 @@ def edit_inventory(item_id):
                 notes or None, item_id
             ))
 
+        if expense_amount_raw:
+            try:
+                expense_amount = float(expense_amount_raw)
+                if expense_amount > 0:
+                    conn.execute("""
+                        INSERT INTO expenses
+                        (title, amount, category, date, notes)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (
+                        f"{name} expense",
+                        expense_amount,
+                        category,
+                        str(date.today()),
+                        "Auto-added from inventory edit",
+                    ))
+            except ValueError:
+                pass
+
         conn.commit()
         backup_inventory(conn)
         conn.close()
@@ -1421,7 +1442,7 @@ def edit_expense(item_id):
         send_telegram(
             f"✏️ <b>Expense Updated</b>\n\n"
             f"📝 <b>{title}</b>\n"
-            f"Amount: <b>${float(amount):.2f}</b>"
+            f"Amount: <b>GHS {float(amount):.2f}</b>"
         )
 
         return redirect(url_for("home"))

@@ -16,21 +16,21 @@
     <div class="stat-box">
         <div class="stat-label">All Time Spending</div>
         <div class="stat-value color-yellow">
-            ${{ "%.2f" | format(all_time_total) }}
+            GHS {{ "%.2f" | format(all_time_total) }}
         </div>
         <div class="stat-sub">{{ total_transactions }} transactions</div>
     </div>
     <div class="stat-box">
         <div class="stat-label">This Month</div>
         <div class="stat-value color-blue">
-            ${{ "%.2f" | format(monthly_this_month) }}
+            GHS {{ "%.2f" | format(monthly_this_month) }}
         </div>
         <div class="stat-sub">current month total</div>
     </div>
     <div class="stat-box">
         <div class="stat-label">Avg Per Transaction</div>
         <div class="stat-value color-green">
-            ${{ "%.2f" | format(avg_transaction) }}
+            GHS {{ "%.2f" | format(avg_transaction) }}
         </div>
         <div class="stat-sub">average spend</div>
     </div>
@@ -137,7 +137,7 @@
         <tr>
             <td style="font-weight:500;">{{ cat_labels[i] }}</td>
             <td style="color:#fcc419; font-weight:600;">
-                ${{ "%.2f" | format(cat_values[i]) }}
+                GHS {{ "%.2f" | format(cat_values[i]) }}
             </td>
             <td style="color:#9099b0;">{{ pct }}%</td>
             <td style="width:200px;">
@@ -190,7 +190,7 @@ new Chart(document.getElementById('categoryChart'), {
             tooltip: {
                 callbacks: {
                     label: function(ctx) {
-                        return ' $' + ctx.parsed.toFixed(2);
+                        return ' GHS ' + ctx.parsed.toFixed(2);
                     }
                 }
             }
@@ -205,7 +205,7 @@ new Chart(document.getElementById('monthlyChart'), {
     data: {
         labels  : {{ month_labels | tojson }},
         datasets: [{
-            label          : 'Monthly Spending ($)',
+            label          : 'Monthly Spending (GHS)',
             data           : {{ month_values | tojson }},
             backgroundColor: 'rgba(79,158,255,0.7)',
             borderColor    : '#4f9eff',
@@ -220,7 +220,7 @@ new Chart(document.getElementById('monthlyChart'), {
             tooltip: {
                 callbacks: {
                     label: function(ctx) {
-                        return ' $' + ctx.parsed.y.toFixed(2);
+                        return ' GHS ' + ctx.parsed.y.toFixed(2);
                     }
                 }
             }
@@ -229,7 +229,7 @@ new Chart(document.getElementById('monthlyChart'), {
             y: {
                 beginAtZero: true,
                 grid       : { color: '#2a2d3e' },
-                ticks      : { callback: function(v) { return '$' + v; } }
+                ticks      : { callback: function(v) { return 'GHS ' + v; } }
             },
             x: { grid: { color: '#2a2d3e' } }
         }
@@ -243,7 +243,7 @@ new Chart(document.getElementById('dailyChart'), {
     data: {
         labels  : {{ day_labels | tojson }},
         datasets: [{
-            label              : 'Daily Spending ($)',
+            label              : 'Daily Spending (GHS)',
             data               : {{ day_values | tojson }},
             borderColor        : '#51cf66',
             backgroundColor    : 'rgba(81,207,102,0.1)',
@@ -261,7 +261,7 @@ new Chart(document.getElementById('dailyChart'), {
             tooltip: {
                 callbacks: {
                     label: function(ctx) {
-                        return ' $' + ctx.parsed.y.toFixed(2);
+                        return ' GHS ' + ctx.parsed.y.toFixed(2);
                     }
                 }
             }
@@ -270,7 +270,7 @@ new Chart(document.getElementById('dailyChart'), {
             y: {
                 beginAtZero: true,
                 grid       : { color: '#2a2d3e' },
-                ticks      : { callback: function(v) { return '$' + v; } }
+                ticks      : { callback: function(v) { return 'GHS ' + v; } }
             },
             x: { grid: { color: '#2a2d3e' } }
         }

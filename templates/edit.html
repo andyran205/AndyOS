@@ -78,6 +78,15 @@
             <textarea name="notes"
                       rows="3">{{ item.notes or '' }}</textarea>
         </div>
+        <div class="form-group">
+            <label>Log Expense Amount (GHS)</label>
+            <input type="number" name="expense_amount"
+                   placeholder="Optional: add inventory cost to expenses"
+                   step="0.01" min="0">
+            <div style="font-size:0.75rem; color:#9099b0; margin-top:0.3rem;">
+                If set, this save also creates an expense entry automatically.
+            </div>
+        </div>
         <div style="display:flex; gap:1rem;">
             <button type="submit" class="btn btn-primary">
                 Save Changes
@@ -127,7 +136,7 @@
             </div>
         </div>
         <div class="form-group">
-            <label>Average Cost ($)</label>
+            <label>Average Cost (GHS)</label>
             <input type="number" name="avg_cost"
                    value="{{ item.avg_cost or '' }}"
                    step="0.01" min="0">
@@ -136,6 +145,15 @@
             <label>Notes</label>
             <textarea name="notes"
                       rows="3">{{ item.notes or '' }}</textarea>
+        </div>
+        <div class="form-group">
+            <label>Log Expense Amount (GHS)</label>
+            <input type="number" name="expense_amount"
+                   placeholder="Optional: add service cost to expenses"
+                   step="0.01" min="0">
+            <div style="font-size:0.75rem; color:#9099b0; margin-top:0.3rem;">
+                If set, this save also creates an expense entry automatically.
+            </div>
         </div>
         <div style="display:flex; gap:1rem;">
             <button type="submit" class="btn btn-primary">
@@ -175,7 +193,7 @@
         </div>
         <div class="grid-2">
             <div class="form-group">
-                <label>Amount ($) *</label>
+                <label>Amount (GHS) *</label>
                 <input type="number" name="amount"
                        value="{{ item.amount }}"
                        step="0.01" min="0" required>

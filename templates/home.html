@@ -63,7 +63,7 @@
     <div class="stat-box">
         <div class="stat-label">Monthly Spending</div>
         <div class="stat-value color-yellow">
-            ${{ "%.2f" | format(monthly_total) }}
+            GHS {{ "%.2f" | format(monthly_total) }}
         </div>
         <div class="stat-sub">this month</div>
     </div>
@@ -404,7 +404,7 @@
                     Last: {{ svc.last_service_date }}
                     · Every {{ svc.frequency_days }} days
                     {% if svc.avg_cost %}
-                    · Avg ${{ "%.2f" | format(svc.avg_cost) }}
+                    · Avg GHS {{ "%.2f" | format(svc.avg_cost) }}
                     {% endif %}
                     {% else %}
                     Never serviced
@@ -549,10 +549,10 @@
                                    font-size:0.78rem;
                                    padding:0.25rem 0.5rem;">
                         <option value="">Any Amount</option>
-                        <option value="0-50">Under $50</option>
-                        <option value="50-200">$50 - $200</option>
-                        <option value="200-500">$200 - $500</option>
-                        <option value="500+">Over $500</option>
+                        <option value="0-50">Under GHS 50</option>
+                        <option value="50-200">GHS 50 - GHS 200</option>
+                        <option value="200-500">GHS 200 - GHS 500</option>
+                        <option value="500+">Over GHS 500</option>
                     </select>
                     <a href="/add-expense"
                        class="btn btn-primary btn-sm">+ Add</a>
@@ -590,7 +590,7 @@
                         </div>
                     </td>
                     <td style="color:#fcc419; font-weight:600;">
-                        ${{ "%.2f" | format(e.amount) }}
+                        GHS {{ "%.2f" | format(e.amount) }}
                     </td>
                     <td style="color:var(--text-muted);
                                font-size:0.82rem;">
