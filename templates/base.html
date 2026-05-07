@@ -89,7 +89,7 @@
             font-weight     : 700;
             color           : var(--text-brand);
             text-decoration : none;
-            margin-right    : 3rem;
+            margin-right    : 0.5rem;
         }
 
         .nav-brand span {
@@ -135,12 +135,14 @@
             padding    : 0.35rem 0.55rem;
             border-radius: 8px;
             cursor     : pointer;
+            margin-right: 0.8rem;
         }
 
         .hamburger-menu {
             position         : absolute;
             top              : 68px;
-            right            : 24px;
+            left             : 24px;
+            right            : auto;
             width            : 300px;
             background-color : var(--bg-card);
             border           : 1px solid var(--border);
@@ -152,6 +154,34 @@
         }
 
         .hamburger-menu.open { display: block; }
+
+        .menu-details {
+            margin-bottom: 0.25rem;
+        }
+
+        .menu-details > summary {
+            list-style: none;
+        }
+
+        .menu-details > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .menu-details[open] > summary.menu-link {
+            background-color : var(--bg-hover);
+            border-color     : var(--border);
+        }
+
+        .menu-details-content {
+            padding-left: 0.25rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .menu-meta {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            padding: 0.35rem 0.55rem 0.5rem;
+        }
 
         .menu-section-title {
             font-size      : 0.75rem;
@@ -650,88 +680,91 @@
 
     <nav>
         <div class="nav-left">
+            <button class="hamburger-btn"
+                    onclick="toggleHamburgerMenu()"
+                    title="Open menu">
+                ☰
+            </button>
             <a href="/" class="nav-brand">Andy<span>OS</span></a>
-            <ul class="nav-links">
-                <li><a href="/">Dashboard</a></li>
-                <li><a href="/add">+ Inventory</a></li>
-                <li><a href="/add-expense">+ Expense</a></li>
-                <li><a href="/add-reminder">+ Reminder</a></li>
-                <li><a href="/analytics">📊 Analytics</a></li>
-            </ul>
         </div>
 
         <div class="nav-right">
-            <button class="hamburger-btn"
-                    onclick="toggleHamburgerMenu()"
-                    title="Open quick menu">
-                ☰
-            </button>
-
-            <!-- THEME TOGGLE -->
-            <div class="theme-toggle" onclick="toggleTheme()"
-                 title="Toggle light / dark mode">
-                <span class="theme-icon" id="theme-icon">🌙</span>
-                <div class="toggle-track">
-                    <div class="toggle-thumb"></div>
-                </div>
-                <span class="theme-icon" id="theme-icon-2">☀️</span>
-            </div>
-
-            <span class="nav-user">
-                👤 {{ session.get("username", "") }}
-            </span>
-            <a href="/logout" class="btn-logout">Logout</a>
         </div>
     </nav>
 
     <div id="hamburger-menu" class="hamburger-menu">
-        <div class="menu-section-title">Quick Actions</div>
-        <a class="menu-link" href="/">🏠 Dashboard</a>
-        <a class="menu-link" href="/add">📦 Add Inventory</a>
-        <a class="menu-link" href="/add-expense">💰 Add Expense</a>
-        <a class="menu-link" href="/add-reminder">🔔 Add Reminder</a>
-        <a class="menu-link" href="/analytics">📊 Open Analytics</a>
+        <details class="menu-details">
+            <summary class="menu-link">👤 Profile</summary>
+            <div class="menu-details-content">
+                <div class="menu-meta">
+                    Signed in as <b>{{ session.get("username", "") }}</b>
+                </div>
+            </div>
+        </details>
 
-        <div class="menu-section-title menu-divider">Dashboard Customize</div>
-        <label class="menu-toggle-row">
-            <span>Show alerts</span>
-            <input type="checkbox" data-pref="showAlerts" checked
-                   onchange="setDashboardPreference('showAlerts', this.checked)">
-        </label>
-        <label class="menu-toggle-row">
-            <span>Show stats</span>
-            <input type="checkbox" data-pref="showStats" checked
-                   onchange="setDashboardPreference('showStats', this.checked)">
-        </label>
-        <label class="menu-toggle-row">
-            <span>Show search/filter</span>
-            <input type="checkbox" data-pref="showSearch" checked
-                   onchange="setDashboardPreference('showSearch', this.checked)">
-        </label>
-        <label class="menu-toggle-row">
-            <span>Show inventory card</span>
-            <input type="checkbox" data-pref="showInventoryCard" checked
-                   onchange="setDashboardPreference('showInventoryCard', this.checked)">
-        </label>
-        <label class="menu-toggle-row">
-            <span>Show services card</span>
-            <input type="checkbox" data-pref="showServicesCard" checked
-                   onchange="setDashboardPreference('showServicesCard', this.checked)">
-        </label>
-        <label class="menu-toggle-row">
-            <span>Show reminders card</span>
-            <input type="checkbox" data-pref="showRemindersCard" checked
-                   onchange="setDashboardPreference('showRemindersCard', this.checked)">
-        </label>
-        <label class="menu-toggle-row">
-            <span>Show expenses card</span>
-            <input type="checkbox" data-pref="showExpensesCard" checked
-                   onchange="setDashboardPreference('showExpensesCard', this.checked)">
-        </label>
-        <button class="menu-link" style="cursor:pointer;"
-                onclick="resetDashboardPreferences()">
-            ↺ Reset Dashboard Layout
-        </button>
+        <details class="menu-details">
+            <summary class="menu-link">⚙️ Settings</summary>
+            <div class="menu-details-content">
+                <div class="menu-section-title">Theme</div>
+                <div class="menu-link" style="cursor:pointer;" onclick="toggleTheme()">
+                    Toggle light / dark mode
+                </div>
+
+                <div class="menu-section-title menu-divider">Dashboard Customize</div>
+                <label class="menu-toggle-row">
+                    <span>Show alerts</span>
+                    <input type="checkbox" data-pref="showAlerts" checked
+                           onchange="setDashboardPreference('showAlerts', this.checked)">
+                </label>
+                <label class="menu-toggle-row">
+                    <span>Show stats</span>
+                    <input type="checkbox" data-pref="showStats" checked
+                           onchange="setDashboardPreference('showStats', this.checked)">
+                </label>
+                <label class="menu-toggle-row">
+                    <span>Show search/filter</span>
+                    <input type="checkbox" data-pref="showSearch" checked
+                           onchange="setDashboardPreference('showSearch', this.checked)">
+                </label>
+                <label class="menu-toggle-row">
+                    <span>Show inventory card</span>
+                    <input type="checkbox" data-pref="showInventoryCard" checked
+                           onchange="setDashboardPreference('showInventoryCard', this.checked)">
+                </label>
+                <label class="menu-toggle-row">
+                    <span>Show services card</span>
+                    <input type="checkbox" data-pref="showServicesCard" checked
+                           onchange="setDashboardPreference('showServicesCard', this.checked)">
+                </label>
+                <label class="menu-toggle-row">
+                    <span>Show reminders card</span>
+                    <input type="checkbox" data-pref="showRemindersCard" checked
+                           onchange="setDashboardPreference('showRemindersCard', this.checked)">
+                </label>
+                <label class="menu-toggle-row">
+                    <span>Show expenses card</span>
+                    <input type="checkbox" data-pref="showExpensesCard" checked
+                           onchange="setDashboardPreference('showExpensesCard', this.checked)">
+                </label>
+                <button class="menu-link" style="cursor:pointer;"
+                        onclick="resetDashboardPreferences()">
+                    ↺ Reset Dashboard Layout
+                </button>
+            </div>
+        </details>
+
+        <details class="menu-details">
+            <summary class="menu-link">⚡ Quick action</summary>
+            <div class="menu-details-content">
+                <a class="menu-link" href="/">🏠 Dashboard</a>
+                <a class="menu-link" href="/add">📦 Add Inventory</a>
+                <a class="menu-link" href="/add-expense">💰 Add Expense</a>
+                <a class="menu-link" href="/add-reminder">🔔 Add Reminder</a>
+                <a class="menu-link" href="/analytics">📊 Open Analytics</a>
+            </div>
+        </details>
+
+        <a class="menu-link menu-divider" href="/logout">🚪 Log out</a>
     </div>
 
     <div class="container">

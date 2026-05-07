@@ -73,6 +73,39 @@
             <input type="date" name="renewal_date"
                    value="{{ item.renewal_date or '' }}">
         </div>
+        <div style="background:#0f1117; border:1px solid #2a2d3e;
+                    border-radius:10px; padding:1rem; margin-bottom:1rem;">
+            <div style="font-size:0.85rem; font-weight:600;
+                        color:#9099b0; margin-bottom:0.8rem;">
+                📊 Tracking Mode
+            </div>
+            <div style="display:flex; gap:1rem; margin-bottom:0.8rem;">
+                <label style="display:flex; align-items:center; gap:0.5rem;">
+                    <input type="radio" name="track_mode" value="manual"
+                           {% if item.track_mode != "auto" %}checked{% endif %}
+                           onchange="toggleEditTrackMode('manual')">
+                    Manual
+                </label>
+                <label style="display:flex; align-items:center; gap:0.5rem;">
+                    <input type="radio" name="track_mode" value="auto"
+                           {% if item.track_mode == "auto" %}checked{% endif %}
+                           onchange="toggleEditTrackMode('auto')">
+                    Auto (hourly deduction)
+                </label>
+            </div>
+            <div id="edit-auto-mode"
+                 style="{% if item.track_mode == 'auto' %}display:block;{% else %}display:none;{% endif %}">
+                <label>Average Daily Use</label>
+                <input type="number" name="avg_daily_use"
+                       id="edit_avg_daily_use"
+                       value="{{ item.avg_daily_use or '' }}"
+                       placeholder="e.g. 3.5"
+                       step="0.01" min="0">
+                <div style="font-size:0.75rem; color:#9099b0; margin-top:0.3rem;">
+                    System deducts continuously every hour from this daily average.
+                </div>
+            </div>
+        </div>
         <div class="form-group">
             <label>Notes</label>
             <textarea name="notes"
@@ -261,5 +294,27 @@
     </form>
 </div>
 {% endif %}
+
+<script>
+function toggleEditTrackMode(mode) {
+    const autoMode = document.getElementById('edit-auto-mode');
+    const avgInput = document.getElementById('edit_avg_daily_use');
+    if (!autoMode || !avgInput) return;
+
+    if (mode === 'auto') {
+        autoMode.style.display = 'block';
+        avgInput.required = true;
+    } else {
+        autoMode.style.display = 'none';
+        avgInput.required = false;
+    }
+}
+document.addEventListener('DOMContentLoaded', function() {
+    const selected = document.querySelector(
+        'input[name="track_mode"]:checked'
+    );
+    if (selected) toggleEditTrackMode(selected.value);
+});
+</script>
 
 {% endblock %}
