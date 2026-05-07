@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
 {% block nav_extra %}
-<div style="display:flex; align-items:center; gap:0.5rem;">
+<div style="display:flex; align-items:center; gap:0.5rem; width:100%;">
     <input type="text" id="global-search"
            placeholder="Search..."
            oninput="runSearch()"
-           style="width:320px; max-width:42vw; margin:0;
+           style="width:320px; max-width:100%; margin:0;
                   padding:0.45rem 0.8rem; border-radius:10px;">
     <button onclick="clearSearch()"
             class="btn btn-primary btn-sm"
@@ -105,7 +105,7 @@
 
         <!-- INVENTORY SECTION -->
         <div id="dashboard-inventory-card" class="card section-inventory">
-            <div style="display:flex; justify-content:space-between;
+            <div class="mobile-stack" style="display:flex; justify-content:space-between;
                         align-items:center; margin-bottom:1rem;">
                 <div class="card-title" style="margin-bottom:0;">
                     📦 Inventory
@@ -153,7 +153,7 @@
                         </span>
                         {% endif %}
                     </div>
-                    <div style="display:flex; gap:0.4rem;">
+                    <div class="mobile-stack-row" style="display:flex; gap:0.4rem;">
                         <a href="/edit-inventory/{{ i.item.id }}"
                            class="btn btn-primary btn-sm">✎</a>
                         <a href="/delete/inventory/{{ i.item.id }}"
@@ -220,7 +220,7 @@
 
         <!-- SERVICES SECTION -->
         <div id="dashboard-services-card" class="card section-services">
-            <div style="display:flex; justify-content:space-between;
+            <div class="mobile-stack" style="display:flex; justify-content:space-between;
                         align-items:center; margin-bottom:1rem;">
                 <div class="card-title" style="margin-bottom:0;">
                     🔧 Services
@@ -258,7 +258,7 @@
                             {{ svc.category }}
                         </span>
                     </div>
-                    <div style="display:flex; gap:0.4rem;">
+                    <div class="mobile-stack-row" style="display:flex; gap:0.4rem;">
                         <a href="/log-service/{{ svc.id }}"
                            class="btn btn-success btn-sm">
                             ✓ Log
@@ -343,7 +343,7 @@
                 <div class="card-title" style="margin-bottom:0;">
                     🔔 Reminders
                 </div>
-                <div style="display:flex; gap:0.4rem;">
+                <div class="mobile-stack-row" style="display:flex; gap:0.4rem;">
                     <!-- Priority filter -->
                     <select id="priority-filter"
                             onchange="runSearch()"
@@ -390,7 +390,7 @@
                         </span>
                     </div>
                 </div>
-                <div style="display:flex; gap:0.4rem;">
+                <div class="mobile-stack-row" style="display:flex; gap:0.4rem;">
                     <a href="/complete-reminder/{{ r.id }}"
                        class="btn btn-success btn-sm">✓</a>
                     <a href="/edit-reminder/{{ r.id }}"
@@ -442,6 +442,7 @@
             </div>
 
             {% if expenses %}
+            <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
@@ -487,6 +488,7 @@
                 {% endfor %}
                 </tbody>
             </table>
+            </div>
 
             {% else %}
             <div class="empty-state">No expenses recorded yet.</div>
