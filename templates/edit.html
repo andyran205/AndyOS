@@ -279,6 +279,44 @@
         </div>
         <div class="grid-2">
             <div class="form-group">
+                <label>Repeat</label>
+                <select name="recurrence" id="recurrence"
+                        onchange="toggleReminderRecurrenceOptions()">
+                    <option value="none" {% if not item.recurrence %}selected{% endif %}>One-time</option>
+                    <option value="daily" {% if item.recurrence == "daily" %}selected{% endif %}>Daily</option>
+                    <option value="weekly" {% if item.recurrence == "weekly" %}selected{% endif %}>Weekly</option>
+                    <option value="monthly" {% if item.recurrence == "monthly" %}selected{% endif %}>Monthly</option>
+                    <option value="yearly" {% if item.recurrence == "yearly" %}selected{% endif %}>Yearly</option>
+                    <option value="minutes" {% if item.recurrence == "minutes" %}selected{% endif %}>Every X minutes</option>
+                </select>
+            </div>
+            <div class="form-group" id="edit-repeat-minutes" style="display:none;">
+                <label>Interval (minutes)</label>
+                <input type="number" name="interval_minutes"
+                       value="{{ item.interval_minutes or '' }}"
+                       placeholder="e.g. 30" min="1" step="1">
+            </div>
+            <div class="form-group" id="edit-repeat-weekly" style="display:none;">
+                <label>Day of week</label>
+                <select name="day_of_week">
+                    <option value="0" {% if item.day_of_week == 0 %}selected{% endif %}>Monday</option>
+                    <option value="1" {% if item.day_of_week == 1 %}selected{% endif %}>Tuesday</option>
+                    <option value="2" {% if item.day_of_week == 2 %}selected{% endif %}>Wednesday</option>
+                    <option value="3" {% if item.day_of_week == 3 %}selected{% endif %}>Thursday</option>
+                    <option value="4" {% if item.day_of_week == 4 %}selected{% endif %}>Friday</option>
+                    <option value="5" {% if item.day_of_week == 5 %}selected{% endif %}>Saturday</option>
+                    <option value="6" {% if item.day_of_week == 6 %}selected{% endif %}>Sunday</option>
+                </select>
+            </div>
+            <div class="form-group" id="edit-repeat-monthly" style="display:none;">
+                <label>Day of month</label>
+                <input type="number" name="day_of_month"
+                       value="{{ item.day_of_month or '' }}"
+                       placeholder="1-31" min="1" max="31" step="1">
+            </div>
+        </div>
+        <div class="grid-2">
+            <div class="form-group">
                 <label>Due Date *</label>
                 <input type="date" name="due_date"
                        value="{{ item.due_date }}" required>
@@ -324,11 +362,25 @@ function toggleEditTrackMode(mode) {
         avgInput.required = false;
     }
 }
+
+function toggleReminderRecurrenceOptions() {
+    const select = document.getElementById('recurrence');
+    if (!select) return;
+    const v = select.value;
+    const minutes = document.getElementById('edit-repeat-minutes');
+    const weekly  = document.getElementById('edit-repeat-weekly');
+    const monthly = document.getElementById('edit-repeat-monthly');
+    if (minutes) minutes.style.display = (v === 'minutes') ? 'block' : 'none';
+    if (weekly)  weekly.style.display  = (v === 'weekly') ? 'block' : 'none';
+    if (monthly) monthly.style.display = (v === 'monthly') ? 'block' : 'none';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const selected = document.querySelector(
         'input[name="track_mode"]:checked'
     );
     if (selected) toggleEditTrackMode(selected.value);
+    toggleReminderRecurrenceOptions();
 });
 </script>
 

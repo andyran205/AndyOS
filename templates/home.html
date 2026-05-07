@@ -1,12 +1,27 @@
 {% extends "base.html" %}
 
+{% block nav_extra %}
+<div style="display:flex; align-items:center; gap:0.5rem;">
+    <input type="text" id="global-search"
+           placeholder="Search..."
+           oninput="runSearch()"
+           style="width:320px; max-width:42vw; margin:0;
+                  padding:0.45rem 0.8rem; border-radius:10px;">
+    <button onclick="clearSearch()"
+            class="btn btn-primary btn-sm"
+            style="white-space:nowrap;">
+        ✕ Clear
+    </button>
+</div>
+{% endblock %}
+
 {% block content %}
 
 <div class="page-header">
     <div>
         <div class="page-title">Dashboard</div>
         <div class="page-subtitle">
-            {{ today }} — Welcome to AndyOS
+            {{ today }} — Welcome to Nku-OS
         </div>
     </div>
 </div>
@@ -77,87 +92,7 @@
 </div>
 
 
-<!-- ============================================================
-     SEARCH BAR
-============================================================ -->
-<div id="dashboard-search" class="card" style="margin-bottom:1.5rem; padding:1rem 1.5rem;">
-    <div style="display:flex; gap:1rem; align-items:center;
-                flex-wrap:wrap;">
-
-        <!-- Search input -->
-        <div style="flex:1; min-width:200px; position:relative;">
-            <span style="position:absolute; left:0.8rem; top:50%;
-                         transform:translateY(-50%);
-                         color:var(--text-muted); font-size:1rem;">
-                🔍
-            </span>
-            <input type="text" id="global-search"
-                   placeholder="Search anything..."
-                   oninput="runSearch()"
-                   style="padding-left:2.4rem; margin:0;">
-        </div>
-
-        <!-- Section filter -->
-        <div style="display:flex; gap:0.4rem; flex-wrap:wrap;">
-            <button class="filter-btn active"
-                    onclick="setSection('all')"
-                    id="sec-all">
-                All
-            </button>
-            <button class="filter-btn"
-                    onclick="setSection('inventory')"
-                    id="sec-inventory">
-                📦 Inventory
-            </button>
-            <button class="filter-btn"
-                    onclick="setSection('services')"
-                    id="sec-services">
-                🔧 Services
-            </button>
-            <button class="filter-btn"
-                    onclick="setSection('expenses')"
-                    id="sec-expenses">
-                💰 Expenses
-            </button>
-            <button class="filter-btn"
-                    onclick="setSection('reminders')"
-                    id="sec-reminders">
-                🔔 Reminders
-            </button>
-        </div>
-
-        <!-- Category filter -->
-        <select id="category-filter"
-                onchange="runSearch()"
-                style="width:auto; min-width:140px; margin:0;">
-            <option value="">All Categories</option>
-            <option value="Food">Food</option>
-            <option value="Utilities">Utilities</option>
-            <option value="Cleaning">Cleaning</option>
-            <option value="Maintenance">Maintenance</option>
-            <option value="Pet">Pet</option>
-            <option value="Medicine">Medicine</option>
-            <option value="Groceries">Groceries</option>
-            <option value="Rent">Rent</option>
-            <option value="Internet">Internet</option>
-            <option value="Other">Other</option>
-        </select>
-
-        <!-- Clear button -->
-        <button onclick="clearSearch()"
-                class="btn btn-primary btn-sm"
-                style="white-space:nowrap;">
-            ✕ Clear
-        </button>
-
-    </div>
-
-    <!-- Search results count -->
-    <div id="search-count"
-         style="font-size:0.78rem; color:var(--text-muted);
-                margin-top:0.6rem; display:none;">
-    </div>
-</div>
+<!-- Search bar moved to top-right nav -->
 
 
 <!-- ============================================================
@@ -201,9 +136,10 @@
                 <div style="display:flex; justify-content:space-between;
                             align-items:center; margin-bottom:0.4rem;">
                     <div>
-                        <span style="font-weight:600;">
+                        <a href="/inventory/{{ i.item.id }}"
+                           style="font-weight:700; color:var(--text-main); text-decoration:none;">
                             {{ i.item.name }}
-                        </span>
+                        </a>
                         <span style="color:var(--text-muted);
                                      font-size:0.75rem;
                                      margin-left:0.5rem;">
@@ -267,68 +203,8 @@
                     </div>
                 </div>
 
-                <!-- Quick deduct + refill buttons -->
-                <div style="display:flex; gap:0.4rem;
-                            flex-wrap:wrap; align-items:center;">
-
-                    {% if i.item.quick_deduct_1 %}
-                    <form action="/deduct/{{ i.item.id }}"
-                          method="POST">
-                        <input type="hidden" name="amount"
-                               value="{{ i.item.quick_deduct_1 }}">
-                        <button type="submit"
-                                class="btn btn-danger btn-sm">
-                            − {{ i.item.quick_deduct_1 }}
-                            {{ i.item.unit }}
-                        </button>
-                    </form>
-                    {% endif %}
-
-                    {% if i.item.quick_deduct_2 %}
-                    <form action="/deduct/{{ i.item.id }}"
-                          method="POST">
-                        <input type="hidden" name="amount"
-                               value="{{ i.item.quick_deduct_2 }}">
-                        <button type="submit"
-                                class="btn btn-danger btn-sm">
-                            − {{ i.item.quick_deduct_2 }}
-                            {{ i.item.unit }}
-                        </button>
-                    </form>
-                    {% endif %}
-
-                    <form action="/deduct/{{ i.item.id }}"
-                          method="POST"
-                          style="display:flex; gap:0.3rem;">
-                        <input type="number" name="amount"
-                               placeholder="custom"
-                               step="0.1" min="0"
-                               style="width:75px;
-                                      padding:0.2rem 0.4rem;
-                                      font-size:0.75rem;
-                                      margin:0;">
-                        <button type="submit"
-                                class="btn btn-danger btn-sm">
-                            − Use
-                        </button>
-                    </form>
-
-                    <form action="/refill/{{ i.item.id }}"
-                          method="POST"
-                          style="display:flex; gap:0.3rem;">
-                        <input type="number" name="custom_amount"
-                               placeholder="qty"
-                               step="0.1" min="0"
-                               style="width:75px;
-                                      padding:0.2rem 0.4rem;
-                                      font-size:0.75rem;
-                                      margin:0;">
-                        <button type="submit"
-                                class="btn btn-success btn-sm">
-                            🛒 Refill
-                        </button>
-                    </form>
-
+                <div style="margin-top:0.6rem; color:var(--text-muted); font-size:0.8rem;">
+                    Tap the item name to log usage/refill.
                 </div>
             </div>
             {% endfor %}
@@ -627,6 +503,14 @@
 <script>
 
 let currentSection = 'all';
+function safeValue(id) {
+    const el = document.getElementById(id);
+    return el ? (el.value || '') : '';
+}
+function safeSetValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = value;
+}
 
 // ── Set which section to show ────────────────────────────────
 function setSection(section) {
@@ -671,12 +555,9 @@ function setSection(section) {
 function runSearch() {
     const query    = document.getElementById('global-search')
                              .value.toLowerCase().trim();
-    const category = document.getElementById('category-filter')
-                             .value.toLowerCase();
-    const priority = document.getElementById('priority-filter')
-                             .value.toLowerCase();
-    const amount   = document.getElementById('amount-filter')
-                             .value;
+    const category = safeValue('category-filter').toLowerCase();
+    const priority = safeValue('priority-filter').toLowerCase();
+    const amount   = safeValue('amount-filter');
 
     const items = document.querySelectorAll('.searchable-item');
     let counts  = {
@@ -772,9 +653,9 @@ function showNoResults(section, count) {
 // ── Clear all search filters ─────────────────────────────────
 function clearSearch() {
     document.getElementById('global-search').value   = '';
-    document.getElementById('category-filter').value = '';
-    document.getElementById('priority-filter').value = '';
-    document.getElementById('amount-filter').value   = '';
+    safeSetValue('category-filter', '');
+    safeSetValue('priority-filter', '');
+    safeSetValue('amount-filter', '');
     currentSection = 'all';
 
     // Reset section buttons

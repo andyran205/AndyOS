@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">📦 {{ item.name }}</div>
+    <div class="page-subtitle">
+      {{ item.category }} · {{ item.item_type }} · {{ item.unit or "unit" }}
+      {% if item.track_mode == "auto" %} · AUTO{% endif %}
+    </div>
+  </div>
+  <div style="display:flex; gap:0.5rem; align-items:center;">
+    <a href="/edit-inventory/{{ item.id }}" class="btn btn-primary">Edit</a>
+    <a href="/" class="btn btn-danger">← Back</a>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title">Stock</div>
+
+    <div style="font-size:0.95rem; margin-bottom:0.6rem;">
+      Current: <b>{{ current }}</b> {{ item.unit }}
+      · Full: <b>{{ item.regular_stock }}</b> {{ item.unit }}
+      · <b>{{ pct }}%</b>
+    </div>
+
+    <div class="progress-bar-bg" style="margin-bottom:1rem;">
+      <div class="progress-bar-fill
+        {% if pct > 50 %}bar-green
+        {% elif pct > 25 %}bar-yellow
+        {% else %}bar-red{% endif %}"
+        style="width:{{ pct }}%;">
+      </div>
+    </div>
+
+    {% if days_left is not none %}
+    <div style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">
+      Estimated: <b>{{ days_left }}</b> day(s) left
+    </div>
+    {% endif %}
+
+    {% if item.avg_daily_value %}
+    <div style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1rem;">
+      Manual daily avg: <b>{{ item.avg_daily_value }}</b> {{ item.avg_daily_value_unit or "" }}
+    </div>
+    {% endif %}
+
+    <form action="/set-daily-average/{{ item.id }}" method="POST"
+          style="margin-bottom:1rem; background:var(--bg-input); border:1px solid var(--border); border-radius:10px; padding:0.8rem;">
+      <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.5rem;">
+        Set daily average deduction (for example ECG daily average)
+      </div>
+      <div style="display:flex; gap:0.4rem; align-items:center; flex-wrap:wrap;">
+        <input type="number" name="avg_daily_use"
+               value="{{ item.avg_daily_use or item.avg_daily_value or '' }}"
+               placeholder="Daily average"
+               step="0.01" min="0"
+               style="width:140px; margin:0;">
+        <input type="text" name="avg_daily_value_unit"
+               value="{{ item.avg_daily_value_unit or (item.unit ~ '/day') }}"
+               placeholder="Unit/day"
+               style="width:140px; margin:0;">
+        <input type="hidden" name="track_mode" value="auto">
+        <button type="submit" class="btn btn-primary btn-sm">
+          Save Daily Avg
+        </button>
+      </div>
+    </form>
+
+    <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+      {% if item.quick_deduct_1 %}
+      <form action="/deduct/{{ item.id }}" method="POST">
+        <input type="hidden" name="amount" value="{{ item.quick_deduct_1 }}">
+        <button type="submit" class="btn btn-danger btn-sm">
+          − {{ item.quick_deduct_1 }} {{ item.unit }}
+        </button>
+      </form>
+      {% endif %}
+
+      {% if item.quick_deduct_2 %}
+      <form action="/deduct/{{ item.id }}" method="POST">
+        <input type="hidden" name="amount" value="{{ item.quick_deduct_2 }}">
+        <button type="submit" class="btn btn-danger btn-sm">
+          − {{ item.quick_deduct_2 }} {{ item.unit }}
+        </button>
+      </form>
+      {% endif %}
+
+      <form action="/deduct/{{ item.id }}" method="POST" style="display:flex; gap:0.4rem;">
+        <input type="number" name="amount"
+               placeholder="custom"
+               step="0.1" min="0"
+               style="width:100px; margin:0;">
+        <button type="submit" class="btn btn-danger btn-sm">− Use</button>
+      </form>
+
+      <form action="/refill/{{ item.id }}" method="POST" style="display:flex; gap:0.4rem;">
+        <input type="number" name="custom_amount"
+               placeholder="qty"
+               step="0.1" min="0"
+               style="width:100px; margin:0;">
+        <button type="submit" class="btn btn-success btn-sm">🛒 Refill</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Recent usage</div>
+
+    {% if usage %}
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Amount</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in usage %}
+        <tr>
+          <td style="color:var(--text-muted); font-size:0.82rem;">{{ u.log_date }}</td>
+          <td style="font-weight:600;">{{ u.amount_used }} {{ item.unit }}</td>
+          <td style="color:var(--text-muted); font-size:0.82rem;">{{ u.notes or "" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">No usage logged yet.</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+

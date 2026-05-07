@@ -114,28 +114,42 @@ def get_user_by_username(conn, username):
 
 
 # ============================================================
-# TELEGRAM CONFIG
+# WHATSAPP CONFIG
 # ============================================================
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-CHAT_ID   = os.environ.get("CHAT_ID", "")
+WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN", "").strip()
+WHATSAPP_PHONE_NUMBER_ID = os.environ.get("WHATSAPP_PHONE_NUMBER_ID", "").strip()
+WHATSAPP_TO = os.environ.get("WHATSAPP_TO", "").strip()
+
+
+def send_notification(message):
+    try:
+        if not (WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_TO):
+            print("WhatsApp not configured; skipping notification.")
+            return
+        url = f"https://graph.facebook.com/v20.0/{WHATSAPP_PHONE_NUMBER_ID}/messages"
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": WHATSAPP_TO,
+            "type": "text",
+            "text": {"body": message},
+        }
+        headers = {
+            "Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}",
+            "Content-Type": "application/json",
+        }
+        response = requests.post(url, headers=headers, json=payload, timeout=8)
+        if response.status_code in (200, 201):
+            print("WhatsApp sent successfully.")
+        else:
+            print(f"WhatsApp error: {response.text}")
+    except Exception as e:
+        print(f"WhatsApp failed (app still works): {e}")
 
 
 def send_telegram(message):
-    try:
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        payload = {
-            "chat_id"    : CHAT_ID,
-            "text"       : message,
-            "parse_mode" : "HTML"
-        }
-        response = requests.post(url, data=payload, timeout=5)
-        if response.status_code == 200:
-            print("Telegram sent successfully.")
-        else:
-            print(f"Telegram error: {response.text}")
-    except Exception as e:
-        print(f"Telegram failed (app still works): {e}")
+    # Backward-compatible wrapper: route all notifications to WhatsApp.
+    send_notification(message)
 
 
 # ============================================================
@@ -156,13 +170,28 @@ def get_days_until_empty(current_stock, avg_daily_use):
         return None
 
 
+def get_effective_daily_use(item):
+    try:
+        if item["avg_daily_use"] and float(item["avg_daily_use"]) > 0:
+            return float(item["avg_daily_use"])
+    except Exception:
+        pass
+    try:
+        if item["avg_daily_value"] and float(item["avg_daily_value"]) > 0:
+            return float(item["avg_daily_value"])
+    except Exception:
+        pass
+    return None
+
+
 def get_calculated_stock(item):
     """
     For items in auto mode, calculate estimated stock continuously
     based on hours since last refill and average daily use.
     """
     try:
-        if item["track_mode"] == "auto" and item["avg_daily_use"]:
+        effective_daily_use = get_effective_daily_use(item)
+        if item["track_mode"] == "auto" and effective_daily_use:
             last_refill_raw = (
                 item["last_refill_at"] or item["last_refill_date"]
             )
@@ -181,7 +210,7 @@ def get_calculated_stock(item):
                 0.0,
                 (datetime.now() - last_refill_dt).total_seconds() / 3600.0
             )
-            used = elapsed_hours * (float(item["avg_daily_use"]) / 24.0)
+            used = elapsed_hours * (effective_daily_use / 24.0)
             estimated   = float(item["regular_stock"]) - used
             return max(0, round(estimated, 2))
         return item["current_stock"]
@@ -282,7 +311,7 @@ def build_daily_briefing():
         lines.append("⚠️ <b>LOW STOCK — Action Needed:</b>")
         for item, pct, current in low_stock:
             days_left = get_days_until_empty(
-                current, item["avg_daily_use"]
+                current, get_effective_daily_use(item)
             )
             line = (
                 f"  • {item['name']}: {current}"
@@ -297,7 +326,7 @@ def build_daily_briefing():
         lines.append("📦 <b>Stock Levels OK:</b>")
         for item, pct, current in ok_stock:
             days_left = get_days_until_empty(
-                current, item["avg_daily_use"]
+                current, get_effective_daily_use(item)
             )
             line = (
                 f"  • {item['name']}: {current}"
@@ -906,7 +935,7 @@ def check_and_alert():
             pct = (current / item["regular_stock"]) * 100
             if pct <= 25:
                 days_left = get_days_until_empty(
-                    current, item["avg_daily_use"]
+                    current, get_effective_daily_use(item)
                 )
                 msg = (
                     f"  • {item['name']}: {current}"
@@ -1299,7 +1328,7 @@ def home():
     for item in inventory_raw:
         current = get_calculated_stock(item)
         days_left = get_days_until_empty(
-            current, item["avg_daily_use"]
+            current, get_effective_daily_use(item)
         )
         pct = 0
         if item["regular_stock"] and item["regular_stock"] > 0:
@@ -1393,7 +1422,7 @@ def inventory_detail(item_id):
             return redirect(url_for("home"))
 
         current = get_calculated_stock(item)
-        days_left = get_days_until_empty(current, item["avg_daily_use"])
+        days_left = get_days_until_empty(current, get_effective_daily_use(item))
         pct = 0
         if item["regular_stock"] and item["regular_stock"] > 0:
             pct = min(int((current / item["regular_stock"]) * 100), 100)
@@ -2002,14 +2031,46 @@ def edit_reminder(item_id):
         title    = request.form.get("title", "").strip()
         due_date = request.form.get("due_date", "").strip()
         priority = request.form.get("priority", "medium").strip()
+        recurrence = request.form.get("recurrence", "none").strip()
+        interval_minutes_raw = request.form.get("interval_minutes", "").strip()
+        day_of_week_raw = request.form.get("day_of_week", "").strip()
+        day_of_month_raw = request.form.get("day_of_month", "").strip()
         notes    = request.form.get("notes", "").strip()
+
+        interval_minutes = None
+        day_of_week = None
+        day_of_month = None
+        if recurrence == "minutes":
+            try:
+                interval_minutes = int(interval_minutes_raw)
+                if interval_minutes < 1:
+                    interval_minutes = None
+            except:
+                interval_minutes = None
+        if recurrence == "weekly":
+            try:
+                day_of_week = int(day_of_week_raw)
+                if day_of_week < 0 or day_of_week > 6:
+                    day_of_week = None
+            except:
+                day_of_week = None
+        if recurrence == "monthly":
+            try:
+                day_of_month = int(day_of_month_raw)
+                if day_of_month < 1 or day_of_month > 31:
+                    day_of_month = None
+            except:
+                day_of_month = None
 
         conn.execute("""
             UPDATE reminders
-            SET title=?, due_date=?, priority=?, notes=?
+            SET title=?, due_date=?, priority=?, recurrence=?,
+                interval_minutes=?, day_of_week=?, day_of_month=?, notes=?
             WHERE id=?
         """, (
             title, due_date, priority,
+            (recurrence if recurrence != "none" else None),
+            interval_minutes, day_of_week, day_of_month,
             notes or None, item_id
         ))
         conn.commit()
@@ -2129,6 +2190,13 @@ def complete_reminder(item_id):
             # and rely on external notification usage. Minimal support to keep it visible.
             return str(today)
 
+        if recurrence == "yearly":
+            base = max(today, current)
+            try:
+                return str(date(base.year + 1, base.month, base.day))
+            except Exception:
+                return str(base + timedelta(days=365))
+
         return None
 
     conn.execute(
@@ -2192,6 +2260,39 @@ def update_stock(item_id):
     conn.close()
 
     return redirect(url_for("home"))
+
+
+@app.route("/set-daily-average/<int:item_id>", methods=["POST"])
+@login_required
+def set_daily_average(item_id):
+    avg_raw = request.form.get("avg_daily_use", "").strip()
+    unit_raw = request.form.get("avg_daily_value_unit", "").strip()
+    mode_raw = request.form.get("track_mode", "").strip() or "auto"
+
+    try:
+        avg_value = float(avg_raw) if avg_raw else None
+    except ValueError:
+        avg_value = None
+
+    conn = get_db()
+    conn.execute("""
+        UPDATE inventory
+        SET avg_daily_use = ?,
+            avg_daily_value = ?,
+            avg_daily_value_unit = ?,
+            track_mode = ?
+        WHERE id = ?
+    """, (
+        avg_value,
+        avg_value,
+        (unit_raw or None),
+        mode_raw,
+        item_id
+    ))
+    conn.commit()
+    backup_inventory(conn)
+    conn.close()
+    return redirect(url_for("inventory_detail", item_id=item_id))
 
 
 # ============================================================
@@ -2317,22 +2418,22 @@ def analytics():
 
 
 # ============================================================
-# ROUTES — TELEGRAM TEST + MANUAL BRIEFING
+# ROUTES — NOTIFICATION TEST + MANUAL BRIEFING
 # ============================================================
 
-@app.route("/test-telegram")
+@app.route("/test-whatsapp")
 @login_required
-def test_telegram():
+def test_whatsapp():
     send_telegram(
         "🏠 <b>Nku-OS Test Message</b>\n\n"
-        "✅ Your Telegram bot is connected and working!\n"
+        "✅ Your WhatsApp channel is connected and working!\n"
         f"🕐 Sent at {datetime.now().strftime('%H:%M on %d %b %Y')}"
     )
     return """
         <h2 style='font-family:sans-serif; color:#51cf66;'>
             ✅ Test message sent!
         </h2>
-        <p style='font-family:sans-serif;'>Check your Telegram.</p>
+        <p style='font-family:sans-serif;'>Check your WhatsApp.</p>
         <a href='/' style='font-family:sans-serif;'>
             ← Back to Dashboard
         </a>
@@ -2346,10 +2447,10 @@ def send_briefing():
     send_telegram(message)
     return """
         <h2 style='font-family:sans-serif; color:#51cf66;'>
-            ✅ Daily briefing sent to Telegram!
+            ✅ Daily briefing sent to WhatsApp!
         </h2>
         <p style='font-family:sans-serif;'>
-            Check your Telegram to see the full briefing.
+            Check your WhatsApp to see the full briefing.
         </p>
         <a href='/' style='font-family:sans-serif;'>
             ← Back to Dashboard
