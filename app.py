@@ -11,6 +11,7 @@ import time
 import hashlib
 from datetime import datetime, date, timedelta
 from functools import wraps
+from pathlib import Path
 
 # ============================================================
 # APP SETUP
@@ -602,6 +603,20 @@ def init_db():
     conn.close()
     print("Database ready at:", DB_PATH)
 
+def _safe_file_info(path_str):
+    try:
+        p = Path(path_str)
+        if not p.exists():
+            return {"exists": False}
+        stat = p.stat()
+        return {
+            "exists": True,
+            "size_bytes": stat.st_size,
+            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        }
+    except Exception as e:
+        return {"exists": False, "error": str(e)}
+
 
 def _inventory_row_to_dict(row):
     return {
@@ -1041,6 +1056,96 @@ def logout():
     )
 
     return redirect(url_for("login"))
+
+@app.route("/debug/storage")
+@login_required
+def debug_storage():
+    """
+    Lightweight diagnostics page to confirm where data is stored.
+    Useful when users think inventory/stocks disappeared after changes.
+    """
+    conn = get_db()
+    try:
+        inventory_count = conn.execute(
+            "SELECT COUNT(*) FROM inventory"
+        ).fetchone()[0]
+        quant_count = conn.execute(
+            "SELECT COUNT(*) FROM inventory WHERE item_type = 'quantifiable'"
+        ).fetchone()[0]
+        svc_count = conn.execute(
+            "SELECT COUNT(*) FROM inventory WHERE item_type = 'service'"
+        ).fetchone()[0]
+        expenses_count = conn.execute(
+            "SELECT COUNT(*) FROM expenses"
+        ).fetchone()[0]
+        reminders_count = conn.execute(
+            "SELECT COUNT(*) FROM reminders"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
+    db_info = _safe_file_info(DB_PATH)
+    backup_info = _safe_file_info(INVENTORY_BACKUP_PATH)
+
+    restore_allowed = inventory_count == 0 and backup_info.get("exists") is True
+
+    return f"""
+    <div style="font-family:Segoe UI, Tahoma, sans-serif; padding:18px;">
+      <h2 style="margin:0 0 10px;">AndyOS Storage Debug</h2>
+      <div style="color:#6b7280; margin-bottom:14px;">
+        This page shows the <b>active</b> database path and backup file so you can confirm you’re looking at the right data.
+      </div>
+
+      <div style="background:#ffffff10; border:1px solid #2a2d3e; border-radius:12px; padding:14px; margin-bottom:14px;">
+        <div><b>DB_PATH</b>: {DB_PATH}</div>
+        <div style="margin-top:6px;"><b>database.db exists</b>: {db_info.get("exists")}</div>
+        <div><b>database.db size</b>: {db_info.get("size_bytes","-")}</div>
+        <div><b>database.db modified</b>: {db_info.get("modified_at","-")}</div>
+      </div>
+
+      <div style="background:#ffffff10; border:1px solid #2a2d3e; border-radius:12px; padding:14px; margin-bottom:14px;">
+        <div><b>Backup path</b>: {INVENTORY_BACKUP_PATH}</div>
+        <div style="margin-top:6px;"><b>inventory_backup.json exists</b>: {backup_info.get("exists")}</div>
+        <div><b>backup size</b>: {backup_info.get("size_bytes","-")}</div>
+        <div><b>backup modified</b>: {backup_info.get("modified_at","-")}</div>
+      </div>
+
+      <div style="background:#ffffff10; border:1px solid #2a2d3e; border-radius:12px; padding:14px; margin-bottom:14px;">
+        <div style="margin-bottom:8px;"><b>Row counts</b></div>
+        <div>Inventory (all): <b>{inventory_count}</b></div>
+        <div>— Quantifiable: <b>{quant_count}</b></div>
+        <div>— Services: <b>{svc_count}</b></div>
+        <div>Expenses: <b>{expenses_count}</b></div>
+        <div>Reminders: <b>{reminders_count}</b></div>
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <a href="/" style="padding:10px 14px; border-radius:10px; border:1px solid #2a2d3e; color:white; text-decoration:none;">← Back to Dashboard</a>
+        {"<a href='/restore-from-backup' style='padding:10px 14px; border-radius:10px; border:1px solid #51cf66; color:#51cf66; text-decoration:none;'>Restore inventory from backup</a>" if restore_allowed else ""}
+      </div>
+
+      <div style="color:#6b7280; margin-top:14px; font-size:12px;">
+        Restore button only appears when inventory is empty and a backup exists.
+      </div>
+    </div>
+    """
+
+@app.route("/restore-from-backup")
+@login_required
+def restore_from_backup():
+    conn = get_db()
+    try:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM inventory"
+        ).fetchone()[0]
+        if count > 0:
+            return redirect(url_for("debug_storage"))
+        restore_inventory_from_backup_if_empty(conn)
+        ensure_default_inventory_items(conn)
+        backup_inventory(conn)
+        return redirect(url_for("home"))
+    finally:
+        conn.close()
 
 
 # ============================================================

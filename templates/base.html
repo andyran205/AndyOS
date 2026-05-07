@@ -887,6 +887,127 @@
                 icon2.textContent = "🌙";
             }
         }
+
+        // ── Persist in-progress form inputs (drafts) ─────────
+        // This prevents losing typed-but-unsaved values on refresh/navigation.
+        (function enableFormDrafts() {
+            const DRAFT_PREFIX = "andyos-formdraft:";
+
+            function getFormKey(form) {
+                const action = (form.getAttribute("action") || "").trim();
+                const id = (form.getAttribute("id") || "").trim();
+                const discriminator = action || id || "form";
+                return `${DRAFT_PREFIX}${location.pathname}:${discriminator}`;
+            }
+
+            function serializeForm(form) {
+                const payload = {};
+                const fields = form.querySelectorAll("input[name], textarea[name], select[name]");
+                fields.forEach((el) => {
+                    const name = el.getAttribute("name");
+                    if (!name) return;
+                    const tag = el.tagName.toLowerCase();
+                    const type = (el.getAttribute("type") || "").toLowerCase();
+                    if (type === "password") return;
+                    if (type === "file") return;
+
+                    if (tag === "select") {
+                        payload[name] = el.value;
+                        return;
+                    }
+
+                    if (type === "checkbox") {
+                        payload[name] = !!el.checked;
+                        return;
+                    }
+
+                    if (type === "radio") {
+                        if (el.checked) payload[name] = el.value;
+                        return;
+                    }
+
+                    payload[name] = el.value;
+                });
+                return payload;
+            }
+
+            function applyDraftToForm(form, draft) {
+                if (!draft || typeof draft !== "object") return;
+                const fields = form.querySelectorAll("input[name], textarea[name], select[name]");
+                fields.forEach((el) => {
+                    const name = el.getAttribute("name");
+                    if (!name || !(name in draft)) return;
+                    const tag = el.tagName.toLowerCase();
+                    const type = (el.getAttribute("type") || "").toLowerCase();
+                    if (type === "password" || type === "file") return;
+
+                    const value = draft[name];
+
+                    if (tag === "select") {
+                        el.value = value ?? "";
+                        return;
+                    }
+
+                    if (type === "checkbox") {
+                        el.checked = !!value;
+                        return;
+                    }
+
+                    if (type === "radio") {
+                        el.checked = String(el.value) === String(value);
+                        return;
+                    }
+
+                    if (typeof value === "string" || typeof value === "number") {
+                        el.value = String(value);
+                    }
+                });
+            }
+
+            function debounce(fn, wait) {
+                let t;
+                return function(...args) {
+                    clearTimeout(t);
+                    t = setTimeout(() => fn.apply(this, args), wait);
+                };
+            }
+
+            document.addEventListener("DOMContentLoaded", () => {
+                const forms = Array.from(document.querySelectorAll("form")).filter(
+                    (f) => !f.hasAttribute("data-no-draft")
+                );
+
+                forms.forEach((form) => {
+                    const key = getFormKey(form);
+                    try {
+                        const raw = localStorage.getItem(key);
+                        const draft = raw ? JSON.parse(raw) : null;
+                        applyDraftToForm(form, draft);
+                    } catch (e) {
+                        // ignore malformed drafts
+                    }
+
+                    const save = debounce(() => {
+                        try {
+                            localStorage.setItem(key, JSON.stringify(serializeForm(form)));
+                        } catch (e) {
+                            // ignore quota/storage errors
+                        }
+                    }, 250);
+
+                    form.addEventListener("input", save);
+                    form.addEventListener("change", save);
+
+                    form.addEventListener("submit", () => {
+                        try {
+                            localStorage.removeItem(key);
+                        } catch (e) {
+                            // ignore
+                        }
+                    });
+                });
+            });
+        })();
     </script>
 
 </body>
