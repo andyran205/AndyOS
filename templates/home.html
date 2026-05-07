@@ -13,7 +13,7 @@
 
 <!-- ALERTS -->
 {% if low_stock or overdue or overdue_services %}
-<div style="margin-bottom:1.5rem;">
+<div id="dashboard-alerts" style="margin-bottom:1.5rem;">
     {% for svc, status in overdue_services %}
     <div class="alert alert-danger">
         🔧 <strong>Service Overdue:</strong>
@@ -45,7 +45,7 @@
 
 
 <!-- STAT BOXES -->
-<div class="grid-4" style="margin-bottom:1.5rem;">
+<div id="dashboard-stats" class="grid-4" style="margin-bottom:1.5rem;">
     <div class="stat-box">
         <div class="stat-label">Inventory Items</div>
         <div class="stat-value color-blue">
@@ -80,7 +80,7 @@
 <!-- ============================================================
      SEARCH BAR
 ============================================================ -->
-<div class="card" style="margin-bottom:1.5rem; padding:1rem 1.5rem;">
+<div id="dashboard-search" class="card" style="margin-bottom:1.5rem; padding:1rem 1.5rem;">
     <div style="display:flex; gap:1rem; align-items:center;
                 flex-wrap:wrap;">
 
@@ -169,7 +169,7 @@
     <div>
 
         <!-- INVENTORY SECTION -->
-        <div class="card section-inventory">
+        <div id="dashboard-inventory-card" class="card section-inventory">
             <div style="display:flex; justify-content:space-between;
                         align-items:center; margin-bottom:1rem;">
                 <div class="card-title" style="margin-bottom:0;">
@@ -343,7 +343,7 @@
 
 
         <!-- SERVICES SECTION -->
-        <div class="card section-services">
+        <div id="dashboard-services-card" class="card section-services">
             <div style="display:flex; justify-content:space-between;
                         align-items:center; margin-bottom:1rem;">
                 <div class="card-title" style="margin-bottom:0;">
@@ -461,7 +461,7 @@
     <div>
 
         <!-- REMINDERS SECTION -->
-        <div class="card section-reminders">
+        <div id="dashboard-reminders-card" class="card section-reminders">
             <div style="display:flex; justify-content:space-between;
                         align-items:center; margin-bottom:1rem;">
                 <div class="card-title" style="margin-bottom:0;">
@@ -535,7 +535,7 @@
 
 
         <!-- EXPENSES SECTION -->
-        <div class="card section-expenses">
+        <div id="dashboard-expenses-card" class="card section-expenses">
             <div style="display:flex; justify-content:space-between;
                         align-items:center; margin-bottom:1rem;">
                 <div class="card-title" style="margin-bottom:0;">
@@ -661,6 +661,9 @@ function setSection(section) {
     });
 
     runSearch();
+    if (typeof applyDashboardPreferences === 'function') {
+        applyDashboardPreferences();
+    }
 }
 
 
@@ -802,6 +805,9 @@ function clearSearch() {
     });
 
     document.getElementById('search-count').style.display = 'none';
+    if (typeof applyDashboardPreferences === 'function') {
+        applyDashboardPreferences();
+    }
 }
 
 

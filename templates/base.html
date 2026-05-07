@@ -127,6 +127,73 @@
             color     : var(--text-muted);
         }
 
+        .hamburger-btn {
+            background : transparent;
+            border     : 1px solid var(--border);
+            color      : var(--text-main);
+            font-size  : 1rem;
+            padding    : 0.35rem 0.55rem;
+            border-radius: 8px;
+            cursor     : pointer;
+        }
+
+        .hamburger-menu {
+            position         : absolute;
+            top              : 68px;
+            right            : 24px;
+            width            : 300px;
+            background-color : var(--bg-card);
+            border           : 1px solid var(--border);
+            border-radius    : 12px;
+            box-shadow       : 0 12px 30px var(--shadow);
+            padding          : 0.9rem;
+            z-index          : 1000;
+            display          : none;
+        }
+
+        .hamburger-menu.open { display: block; }
+
+        .menu-section-title {
+            font-size      : 0.75rem;
+            color          : var(--text-muted);
+            text-transform : uppercase;
+            letter-spacing : 0.05em;
+            margin         : 0.55rem 0 0.4rem;
+        }
+
+        .menu-link {
+            display         : block;
+            width           : 100%;
+            text-decoration : none;
+            color           : var(--text-main);
+            background-color: transparent;
+            border          : 1px solid transparent;
+            border-radius   : 8px;
+            padding         : 0.45rem 0.55rem;
+            font-size       : 0.86rem;
+            margin-bottom   : 0.25rem;
+        }
+
+        .menu-link:hover {
+            background-color : var(--bg-hover);
+            border-color     : var(--border);
+        }
+
+        .menu-toggle-row {
+            display         : flex;
+            align-items     : center;
+            justify-content : space-between;
+            font-size       : 0.84rem;
+            color           : var(--text-main);
+            padding         : 0.35rem 0;
+        }
+
+        .menu-divider {
+            border-top  : 1px solid var(--border);
+            margin-top  : 0.5rem;
+            padding-top : 0.5rem;
+        }
+
         .btn-logout {
             background-color : transparent;
             color            : #ff6b6b;
@@ -594,6 +661,11 @@
         </div>
 
         <div class="nav-right">
+            <button class="hamburger-btn"
+                    onclick="toggleHamburgerMenu()"
+                    title="Open quick menu">
+                ☰
+            </button>
 
             <!-- THEME TOGGLE -->
             <div class="theme-toggle" onclick="toggleTheme()"
@@ -612,11 +684,142 @@
         </div>
     </nav>
 
+    <div id="hamburger-menu" class="hamburger-menu">
+        <div class="menu-section-title">Quick Actions</div>
+        <a class="menu-link" href="/">🏠 Dashboard</a>
+        <a class="menu-link" href="/add">📦 Add Inventory</a>
+        <a class="menu-link" href="/add-expense">💰 Add Expense</a>
+        <a class="menu-link" href="/add-reminder">🔔 Add Reminder</a>
+        <a class="menu-link" href="/analytics">📊 Open Analytics</a>
+
+        <div class="menu-section-title menu-divider">Dashboard Customize</div>
+        <label class="menu-toggle-row">
+            <span>Show alerts</span>
+            <input type="checkbox" data-pref="showAlerts" checked
+                   onchange="setDashboardPreference('showAlerts', this.checked)">
+        </label>
+        <label class="menu-toggle-row">
+            <span>Show stats</span>
+            <input type="checkbox" data-pref="showStats" checked
+                   onchange="setDashboardPreference('showStats', this.checked)">
+        </label>
+        <label class="menu-toggle-row">
+            <span>Show search/filter</span>
+            <input type="checkbox" data-pref="showSearch" checked
+                   onchange="setDashboardPreference('showSearch', this.checked)">
+        </label>
+        <label class="menu-toggle-row">
+            <span>Show inventory card</span>
+            <input type="checkbox" data-pref="showInventoryCard" checked
+                   onchange="setDashboardPreference('showInventoryCard', this.checked)">
+        </label>
+        <label class="menu-toggle-row">
+            <span>Show services card</span>
+            <input type="checkbox" data-pref="showServicesCard" checked
+                   onchange="setDashboardPreference('showServicesCard', this.checked)">
+        </label>
+        <label class="menu-toggle-row">
+            <span>Show reminders card</span>
+            <input type="checkbox" data-pref="showRemindersCard" checked
+                   onchange="setDashboardPreference('showRemindersCard', this.checked)">
+        </label>
+        <label class="menu-toggle-row">
+            <span>Show expenses card</span>
+            <input type="checkbox" data-pref="showExpensesCard" checked
+                   onchange="setDashboardPreference('showExpensesCard', this.checked)">
+        </label>
+        <button class="menu-link" style="cursor:pointer;"
+                onclick="resetDashboardPreferences()">
+            ↺ Reset Dashboard Layout
+        </button>
+    </div>
+
     <div class="container">
         {% block content %}{% endblock %}
     </div>
 
     <script>
+        const defaultDashboardPrefs = {
+            showAlerts: true,
+            showStats: true,
+            showSearch: true,
+            showInventoryCard: true,
+            showServicesCard: true,
+            showRemindersCard: true,
+            showExpensesCard: true
+        };
+
+        function getDashboardPreferences() {
+            try {
+                const raw = localStorage.getItem(
+                    "andyos-dashboard-prefs"
+                );
+                const parsed = raw ? JSON.parse(raw) : {};
+                return { ...defaultDashboardPrefs, ...parsed };
+            } catch (e) {
+                return { ...defaultDashboardPrefs };
+            }
+        }
+
+        function saveDashboardPreferences(prefs) {
+            localStorage.setItem(
+                "andyos-dashboard-prefs",
+                JSON.stringify(prefs)
+            );
+        }
+
+        function setDashboardPreference(key, value) {
+            const prefs = getDashboardPreferences();
+            prefs[key] = !!value;
+            saveDashboardPreferences(prefs);
+            applyDashboardPreferences();
+        }
+
+        function resetDashboardPreferences() {
+            saveDashboardPreferences({ ...defaultDashboardPrefs });
+            applyDashboardPreferences();
+        }
+
+        function applyDashboardPreferences() {
+            const prefs = getDashboardPreferences();
+            const mapping = {
+                showAlerts: "dashboard-alerts",
+                showStats: "dashboard-stats",
+                showSearch: "dashboard-search",
+                showInventoryCard: "dashboard-inventory-card",
+                showServicesCard: "dashboard-services-card",
+                showRemindersCard: "dashboard-reminders-card",
+                showExpensesCard: "dashboard-expenses-card"
+            };
+
+            Object.keys(mapping).forEach((key) => {
+                const el = document.getElementById(mapping[key]);
+                if (el) {
+                    el.style.display = prefs[key] ? "" : "none";
+                }
+            });
+
+            document.querySelectorAll("[data-pref]").forEach((input) => {
+                const key = input.getAttribute("data-pref");
+                if (key in prefs) input.checked = !!prefs[key];
+            });
+        }
+
+        function toggleHamburgerMenu() {
+            const menu = document.getElementById("hamburger-menu");
+            if (!menu) return;
+            menu.classList.toggle("open");
+        }
+
+        document.addEventListener("click", function(e) {
+            const menu = document.getElementById("hamburger-menu");
+            const button = document.querySelector(".hamburger-btn");
+            if (!menu || !button) return;
+            if (!menu.contains(e.target) && !button.contains(e.target)) {
+                menu.classList.remove("open");
+            }
+        });
+
         // ── Load saved theme on every page ──────────────────
         (function() {
             const saved = localStorage.getItem("andyos-theme")
@@ -625,6 +828,7 @@
                 "data-theme", saved
             );
             updateIcon(saved);
+            applyDashboardPreferences();
         })();
 
         // ── Toggle between dark and light ───────────────────
