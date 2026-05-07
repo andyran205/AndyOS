@@ -47,12 +47,87 @@
 
     <div style="display:flex; flex-direction:column; gap:0.6rem;">
       <a class="btn btn-primary" href="/export/json">Download full export (JSON)</a>
+      <p style="font-size:0.78rem; color:var(--text-muted); margin:-0.35rem 0 0;">
+        Includes inventory, usage &amp; service logs, expenses, reminders
+        (<code>export_version</code> 2).
+      </p>
       <a class="btn btn-success" href="/export/csv/inventory">Export inventory (CSV)</a>
       <a class="btn btn-success" href="/export/csv/expenses">Export expenses (CSV)</a>
       <a class="btn btn-success" href="/export/csv/reminders">Export reminders (CSV)</a>
       <a class="btn btn-danger" href="/debug/storage">Storage debug / restore</a>
     </div>
   </div>
+</div>
+
+<div class="card" style="margin-top:1.25rem;">
+  <div class="card-title">Restore from full JSON backup</div>
+
+  <p style="color:var(--text-muted); font-size:0.88rem;
+            margin-bottom:1rem; line-height:1.45;">
+    Use the same file from <b>Download full export (JSON)</b> (includes
+    inventory, services, usage history, service history, expenses, and reminders).
+    This replaces <b>all</b> of that data in the current database.
+    <b>User accounts are never changed</b> — you keep logins and approvals.
+  </p>
+
+  <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:1rem;">
+    <b>Copy-paste:</b> open your <code>.json</code> backup in any text editor,
+    select all (Ctrl+A), copy, and paste into the box below.
+    Or upload the file directly.
+  </p>
+
+  <form action="/import/json" method="POST"
+        enctype="multipart/form-data"
+        data-no-draft>
+    <div class="form-group" style="margin-bottom:1rem;">
+      <label class="form-label" style="display:block; font-size:0.85rem;
+             color:var(--text-muted); margin-bottom:0.35rem;">
+        Backup file (.json)
+      </label>
+      <input type="file" name="json_file" accept=".json,application/json"
+             style="font-size:0.85rem;">
+    </div>
+
+    <div class="form-group" style="margin-bottom:1rem;">
+      <label class="form-label" style="display:block; font-size:0.85rem;
+             color:var(--text-muted); margin-bottom:0.35rem;">
+        Or paste JSON here
+      </label>
+      <textarea name="json_paste" rows="8"
+                placeholder='Paste full contents of andyos-export-….json …'
+                style="width:100%; font-family:ui-monospace,Consolas,monospace;
+                       font-size:0.78rem; padding:0.6rem;
+                       border-radius:8px;
+                       border:1px solid var(--border);
+                       background:var(--bg-input); color:var(--text-main);"
+      ></textarea>
+    </div>
+
+    <label style="display:flex; align-items:flex-start; gap:0.55rem;
+                  cursor:pointer; font-size:0.84rem;
+                  margin-bottom:1rem; color:var(--text-main);">
+      <input type="checkbox" name="confirm_replace" value="1"
+             required style="margin-top:0.2rem;">
+      <span>I understand this will <b>delete and replace</b> all inventory,
+        expenses, reminders, and related logs in this database (not users).</span>
+    </label>
+
+    <button type="submit" class="btn btn-danger">
+      Restore from backup
+    </button>
+  </form>
+
+  <details style="margin-top:1.25rem; font-size:0.82rem;
+                  color:var(--text-muted);">
+    <summary style="cursor:pointer; color:var(--text-brand);">
+      Before you upgrade hosting / redeploy
+    </summary>
+    <p style="margin-top:0.6rem; line-height:1.45;">
+      Download a fresh JSON export <i>before</i> each upgrade. After the new
+      version is running, open Settings and restore from that file so nothing
+      needs to be retyped.
+    </p>
+  </details>
 </div>
 
 <script>

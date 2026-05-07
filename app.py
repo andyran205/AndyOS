@@ -1498,6 +1498,176 @@ def restore_from_backup():
     finally:
         conn.close()
 
+IMPORT_TABLE_COLUMNS = {
+    "inventory": (
+        "name",
+        "category",
+        "item_type",
+        "track_mode",
+        "current_stock",
+        "regular_stock",
+        "unit",
+        "renewal_date",
+        "last_service_date",
+        "frequency_days",
+        "avg_cost",
+        "avg_daily_use",
+        "avg_daily_value",
+        "avg_daily_value_unit",
+        "quick_deduct_1",
+        "quick_deduct_2",
+        "last_refill_date",
+        "last_refill_at",
+        "notes",
+        "created_at",
+    ),
+    "usage_log": (
+        "inventory_id",
+        "amount_used",
+        "log_date",
+        "notes",
+        "created_at",
+    ),
+    "service_log": (
+        "inventory_id",
+        "service_date",
+        "cost",
+        "notes",
+        "created_at",
+    ),
+    "expenses": (
+        "title",
+        "amount",
+        "category",
+        "date",
+        "notes",
+        "created_at",
+    ),
+    "reminders": (
+        "title",
+        "due_date",
+        "priority",
+        "done",
+        "recurrence",
+        "interval_minutes",
+        "day_of_week",
+        "day_of_month",
+        "notes",
+        "created_at",
+    ),
+}
+
+
+def _insert_import_row(cursor, table, row_dict, column_tuple):
+    vals = [row_dict.get(col) for col in column_tuple]
+    cols_sql = ",".join(column_tuple)
+    placeholders = ",".join(["?"] * len(column_tuple))
+    cursor.execute(
+        f"INSERT INTO {table} ({cols_sql}) VALUES ({placeholders})",
+        vals,
+    )
+
+
+def apply_full_json_import(conn, payload):
+    """
+    Replace inventory, usage_log, service_log, expenses, and reminders
+    from an export payload. Does not modify users or login accounts.
+    """
+    if not isinstance(payload, dict):
+        raise ValueError("Backup must be a JSON object at the top level.")
+
+    inv = payload.get("inventory")
+    exp = payload.get("expenses")
+    rem = payload.get("reminders")
+    if inv is None and exp is None and rem is None:
+        raise ValueError(
+            "Backup must include at least one of: "
+            "inventory, expenses, reminders."
+        )
+
+    inv_list = inv if isinstance(inv, list) else []
+    exp_list = exp if isinstance(exp, list) else []
+    rem_list = rem if isinstance(rem, list) else []
+    ulog_list = payload.get("usage_log")
+    slog_list = payload.get("service_log")
+    ulog_list = ulog_list if isinstance(ulog_list, list) else []
+    slog_list = slog_list if isinstance(slog_list, list) else []
+
+    cur = conn.cursor()
+    cur.execute("DELETE FROM usage_log")
+    cur.execute("DELETE FROM service_log")
+    cur.execute("DELETE FROM inventory")
+    cur.execute("DELETE FROM expenses")
+    cur.execute("DELETE FROM reminders")
+
+    id_map = {}
+    icols = IMPORT_TABLE_COLUMNS["inventory"]
+
+    for item in inv_list:
+        if not isinstance(item, dict):
+            continue
+        raw_old = item.get("id")
+        try:
+            old_id = int(raw_old) if raw_old is not None else None
+        except (TypeError, ValueError):
+            old_id = None
+        _insert_import_row(cur, "inventory", item, icols)
+        new_id = cur.lastrowid
+        if old_id is not None:
+            id_map[old_id] = new_id
+
+    use_cols = IMPORT_TABLE_COLUMNS["usage_log"]
+    for log in ulog_list:
+        if not isinstance(log, dict):
+            continue
+        try:
+            oid = int(log.get("inventory_id"))
+        except (TypeError, ValueError):
+            continue
+        nid = id_map.get(oid)
+        if nid is None:
+            continue
+        row = dict(log)
+        row["inventory_id"] = nid
+        _insert_import_row(cur, "usage_log", row, use_cols)
+
+    svc_cols = IMPORT_TABLE_COLUMNS["service_log"]
+    for log in slog_list:
+        if not isinstance(log, dict):
+            continue
+        try:
+            oid = int(log.get("inventory_id"))
+        except (TypeError, ValueError):
+            continue
+        nid = id_map.get(oid)
+        if nid is None:
+            continue
+        row = dict(log)
+        row["inventory_id"] = nid
+        _insert_import_row(cur, "service_log", row, svc_cols)
+
+    ecols = IMPORT_TABLE_COLUMNS["expenses"]
+    for row in exp_list:
+        if isinstance(row, dict):
+            _insert_import_row(cur, "expenses", row, ecols)
+
+    rcols = IMPORT_TABLE_COLUMNS["reminders"]
+    for row in rem_list:
+        if isinstance(row, dict):
+            rr = dict(row)
+            if rr.get("done") is None:
+                rr["done"] = 0
+            _insert_import_row(cur, "reminders", rr, rcols)
+
+    return {
+        "inventory": len(inv_list),
+        "usage_log": len(ulog_list),
+        "service_log": len(slog_list),
+        "expenses": len(exp_list),
+        "reminders": len(rem_list),
+    }
+
+
 @app.route("/export/json")
 @login_required
 def export_json():
@@ -1512,11 +1682,20 @@ def export_json():
         reminders = conn.execute(
             "SELECT * FROM reminders ORDER BY due_date ASC, id ASC"
         ).fetchall()
+        usage_log = conn.execute(
+            "SELECT * FROM usage_log ORDER BY id ASC"
+        ).fetchall()
+        service_log = conn.execute(
+            "SELECT * FROM service_log ORDER BY id ASC"
+        ).fetchall()
 
         payload = {
+            "export_version": 2,
             "exported_at": datetime.now().isoformat(),
             "db_path": DB_PATH,
             "inventory": [dict(row) for row in inventory],
+            "usage_log": [dict(row) for row in usage_log],
+            "service_log": [dict(row) for row in service_log],
             "expenses": [dict(row) for row in expenses],
             "reminders": [dict(row) for row in reminders],
         }
@@ -1565,6 +1744,91 @@ def export_csv(table):
         mimetype="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
+
+
+IMPORT_JSON_MAX_BYTES = int(
+    os.environ.get("ANDYOS_IMPORT_MAX_BYTES", str(25 * 1024 * 1024))
+)
+
+
+@app.route("/import/json", methods=["POST"])
+@login_required
+def import_json():
+    if not request.form.get("confirm_replace"):
+        flash(
+            "Please check the confirmation box before restoring from backup.",
+            "danger",
+        )
+        return redirect(url_for("settings"))
+
+    raw_bytes = None
+    up = request.files.get("json_file")
+    if up and up.filename:
+        raw_bytes = up.read()
+
+    raw_text = ""
+    if raw_bytes is not None:
+        if len(raw_bytes) > IMPORT_JSON_MAX_BYTES:
+            flash("Backup file is too large.", "danger")
+            return redirect(url_for("settings"))
+        raw_text = raw_bytes.decode("utf-8", errors="replace")
+
+    if not raw_text.strip():
+        raw_text = request.form.get("json_paste", "").strip()
+
+    if len(raw_text.encode("utf-8")) > IMPORT_JSON_MAX_BYTES:
+        flash("Backup JSON is too large.", "danger")
+        return redirect(url_for("settings"))
+
+    if not raw_text.strip():
+        flash(
+            "Paste the backup JSON or upload the file from "
+            "\"Download full export (JSON)\".",
+            "danger",
+        )
+        return redirect(url_for("settings"))
+
+    try:
+        payload = json.loads(raw_text)
+    except json.JSONDecodeError as exc:
+        flash(f"Invalid JSON: {exc}", "danger")
+        return redirect(url_for("settings"))
+
+    conn = get_db()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        stats = apply_full_json_import(conn, payload)
+        conn.commit()
+        backup_inventory(conn)
+
+        flash(
+            "Restore complete — inventory "
+            f"{stats['inventory']}, expenses {stats['expenses']}, "
+            f"reminders {stats['reminders']}, usage logs "
+            f"{stats['usage_log']}, service logs "
+            f"{stats['service_log']}. User accounts were not changed.",
+            "success",
+        )
+
+        send_telegram(
+            f"📥 <b>Nku-OS full restore</b>\n"
+            f"User <b>{session.get('username', '')}</b> imported a backup\n"
+            f"📦 {stats['inventory']} inventory · "
+            f"💰 {stats['expenses']} expenses · "
+            f"🔔 {stats['reminders']} reminders\n"
+            f"🕐 {datetime.now().strftime('%H:%M on %d %b %Y')}"
+        )
+    except ValueError as exc:
+        conn.rollback()
+        flash(str(exc), "danger")
+    except sqlite3.Error as exc:
+        conn.rollback()
+        flash(f"Database error during restore: {exc}", "danger")
+    finally:
+        conn.close()
+
+    return redirect(url_for("settings"))
+
 
 @app.route("/settings")
 @login_required
