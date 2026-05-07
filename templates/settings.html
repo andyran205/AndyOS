@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Settings</div>
+    <div class="page-subtitle">Customize your dashboard and protect your data</div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-title">Dashboard</div>
+
+    <div style="color:var(--text-muted); font-size:0.88rem; margin-bottom:0.9rem;">
+      Dashboard visibility toggles are stored on this device (browser) so your layout stays the way you like it.
+    </div>
+
+    <button class="btn btn-primary" onclick="resetDashboardPreferences()">
+      Reset dashboard layout
+    </button>
+
+    <button class="btn btn-danger" style="margin-left:0.5rem;"
+            onclick="showAllDashboardSections()">
+      Show all sections
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Data</div>
+
+    <div style="display:flex; flex-direction:column; gap:0.6rem;">
+      <a class="btn btn-primary" href="/export/json">Download full export (JSON)</a>
+      <a class="btn btn-success" href="/export/csv/inventory">Export inventory (CSV)</a>
+      <a class="btn btn-success" href="/export/csv/expenses">Export expenses (CSV)</a>
+      <a class="btn btn-success" href="/export/csv/reminders">Export reminders (CSV)</a>
+      <a class="btn btn-danger" href="/debug/storage">Storage debug / restore</a>
+    </div>
+  </div>
+</div>
+
+<script>
+function showAllDashboardSections() {
+  const prefs = {
+    showAlerts: true,
+    showStats: true,
+    showSearch: true,
+    showInventoryCard: true,
+    showServicesCard: true,
+    showRemindersCard: true,
+    showExpensesCard: true
+  };
+  try {
+    localStorage.setItem("andyos-dashboard-prefs", JSON.stringify(prefs));
+  } catch (e) {}
+  if (typeof applyDashboardPreferences === "function") {
+    applyDashboardPreferences();
+  }
+}
+</script>
+
+{% endblock %}
+

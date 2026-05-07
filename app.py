@@ -12,6 +12,8 @@ import hashlib
 from datetime import datetime, date, timedelta
 from functools import wraps
 from pathlib import Path
+import csv
+import io
 
 # ============================================================
 # APP SETUP
@@ -53,6 +55,7 @@ if not BACKUP_DIR:
 INVENTORY_BACKUP_PATH = os.path.join(
     BACKUP_DIR, "inventory_backup.json"
 )
+BACKUP_KEEP_COUNT = int(os.environ.get("ANDYOS_BACKUP_KEEP_COUNT", "20"))
 DEFAULT_INVENTORY_ITEMS = [
     {"name": "Electricity bill", "category": "Utilities", "item_type": "quantifiable", "unit": "kWh", "current_stock": 0, "regular_stock": 0},
     {"name": "Water bill", "category": "Utilities", "item_type": "service", "frequency_days": 30},
@@ -655,8 +658,35 @@ def backup_inventory(conn=None):
             "items": [_inventory_row_to_dict(row) for row in rows],
         }
         os.makedirs(BACKUP_DIR, exist_ok=True)
+
+        # Always keep a stable "latest" file.
         with open(INVENTORY_BACKUP_PATH, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2)
+
+        # Also keep timestamped snapshots for safety.
+        ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+        snap_path = os.path.join(BACKUP_DIR, f"inventory_backup-{ts}.json")
+        with open(snap_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+
+        # Prune old snapshots.
+        try:
+            snaps = []
+            for name in os.listdir(BACKUP_DIR):
+                if name.startswith("inventory_backup-") and name.endswith(".json"):
+                    full = os.path.join(BACKUP_DIR, name)
+                    try:
+                        snaps.append((os.path.getmtime(full), full))
+                    except Exception:
+                        pass
+            snaps.sort(reverse=True)
+            for _, old_path in snaps[BACKUP_KEEP_COUNT:]:
+                try:
+                    os.remove(old_path)
+                except Exception:
+                    pass
+        except Exception:
+            pass
     except Exception as e:
         print(f"Inventory backup failed: {e}")
     finally:
@@ -1146,6 +1176,79 @@ def restore_from_backup():
         return redirect(url_for("home"))
     finally:
         conn.close()
+
+@app.route("/export/json")
+@login_required
+def export_json():
+    conn = get_db()
+    try:
+        inventory = conn.execute(
+            "SELECT * FROM inventory ORDER BY name"
+        ).fetchall()
+        expenses = conn.execute(
+            "SELECT * FROM expenses ORDER BY date DESC, id DESC"
+        ).fetchall()
+        reminders = conn.execute(
+            "SELECT * FROM reminders ORDER BY due_date ASC, id ASC"
+        ).fetchall()
+
+        payload = {
+            "exported_at": datetime.now().isoformat(),
+            "db_path": DB_PATH,
+            "inventory": [dict(row) for row in inventory],
+            "expenses": [dict(row) for row in expenses],
+            "reminders": [dict(row) for row in reminders],
+        }
+    finally:
+        conn.close()
+
+    from flask import Response
+    body = json.dumps(payload, indent=2, default=str)
+    filename = f"andyos-export-{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
+    return Response(
+        body,
+        mimetype="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+@app.route("/export/csv/<string:table>")
+@login_required
+def export_csv(table):
+    allowed = {"inventory", "expenses", "reminders"}
+    if table not in allowed:
+        return "Not allowed", 403
+
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            f"SELECT * FROM {table} ORDER BY id ASC"
+        ).fetchall()
+        data = [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    if not data:
+        writer.writerow(["(no rows)"])
+    else:
+        headers = list(data[0].keys())
+        writer.writerow(headers)
+        for row in data:
+            writer.writerow([row.get(h, "") for h in headers])
+
+    from flask import Response
+    filename = f"andyos-{table}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.csv"
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
+@app.route("/settings")
+@login_required
+def settings():
+    return render_template("settings.html")
 
 
 # ============================================================
