@@ -101,8 +101,55 @@ def login_required(f):
     return decorated
 
 
+def is_primary_admin_user(username):
+    """The env-configured LOGIN_USERNAME acts as household owner / approver."""
+    if not username:
+        return False
+    return username.strip().lower() == LOGIN_USERNAME.strip().lower()
+
+
+def primary_admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not is_logged_in():
+            return redirect(url_for("login"))
+        if not is_primary_admin_user(session.get("username")):
+            flash(
+                "Only the primary administrator can manage account approvals.",
+                "danger",
+            )
+            return redirect(url_for("home"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+def user_is_fully_active(user_row):
+    """Existing accounts without the column behave as approved (grandfathered)."""
+    if user_row is None:
+        return False
+    keys = user_row.keys()
+    if "approved" not in keys:
+        return True
+    ap = user_row["approved"]
+    if ap is None:
+        return True
+    try:
+        return int(ap) == 1
+    except (TypeError, ValueError):
+        return False
+
+
 def hash_password(password):
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+
+@app.context_processor
+def inject_template_globals():
+    uname = session.get("username") or ""
+    return {
+        "is_primary_admin": is_primary_admin_user(uname),
+        "login_username": LOGIN_USERNAME,
+    }
 
 
 def get_user_by_username(conn, username):
@@ -620,6 +667,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
+            approved INTEGER NOT NULL DEFAULT 0,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -643,8 +691,28 @@ def init_db():
             cursor.execute(
                 f"ALTER TABLE reminders ADD COLUMN {col_name} {col_def}"
             )
-        except:
+        except Exception:
             pass
+
+    user_columns = [
+        ("approved", "INTEGER"),
+    ]
+    for col_name, col_def in user_columns:
+        try:
+            cursor.execute(
+                f"ALTER TABLE users ADD COLUMN {col_name} {col_def}"
+            )
+        except Exception:
+            pass
+
+    # Grandfather every account that existed before `approved`
+    # was introduced (approved IS NULL). New signups use 0 explicitly.
+    try:
+        cursor.execute(
+            "UPDATE users SET approved = 1 WHERE approved IS NULL"
+        )
+    except Exception:
+        pass
 
     conn.commit()
 
@@ -972,8 +1040,8 @@ def ensure_default_login_user(conn):
             return
 
         conn.execute("""
-            INSERT INTO users (username, password_hash)
-            VALUES (?, ?)
+            INSERT INTO users (username, password_hash, approved)
+            VALUES (?, ?, 1)
         """, (LOGIN_USERNAME, hash_password(LOGIN_PASSWORD)))
         conn.commit()
         print(f"Created default login user: {LOGIN_USERNAME}")
@@ -1100,8 +1168,11 @@ def login():
     error = None
     info = None
 
-    if request.args.get("created") == "1":
-        info = "Account created. You can sign in now."
+    if request.args.get("pending") == "1":
+        info = (
+            "Registration received. Ask the administrator "
+            f"({LOGIN_USERNAME}) to approve your account before you can sign in."
+        )
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -1111,27 +1182,37 @@ def login():
         user = get_user_by_username(conn, username)
         conn.close()
 
-        valid_user = (
-            user is not None and
-            user["password_hash"] == hash_password(password)
-        )
+        if user is not None:
+            if user["password_hash"] != hash_password(password):
+                error = "Wrong username or password. Try again."
+            elif not user_is_fully_active(user):
+                error = (
+                    "This account has not been approved yet. "
+                    "Please wait for the administrator."
+                )
+            else:
+                session["logged_in"] = True
+                session["username"]  = username
 
-        # Backward-compatible fallback for older env-based login.
-        if not valid_user and username == LOGIN_USERNAME and password == LOGIN_PASSWORD:
-            valid_user = True
+                send_telegram(
+                    f"🔐 <b>Nku-OS Login</b>\n"
+                    f"User <b>{username}</b> logged in\n"
+                    f"🕐 {datetime.now().strftime('%H:%M on %d %b %Y')}"
+                )
 
-        if valid_user:
-            session["logged_in"] = True
-            session["username"]  = username
-
-            send_telegram(
-                f"🔐 <b>Nku-OS Login</b>\n"
-                f"User <b>{username}</b> logged in\n"
-                f"🕐 {datetime.now().strftime('%H:%M on %d %b %Y')}"
-            )
-
-            return redirect(url_for("home"))
+                return redirect(url_for("home"))
         else:
+            if username == LOGIN_USERNAME and password == LOGIN_PASSWORD:
+                session["logged_in"] = True
+                session["username"]  = username
+
+                send_telegram(
+                    f"🔐 <b>Nku-OS Login</b>\n"
+                    f"User <b>{username}</b> logged in\n"
+                    f"🕐 {datetime.now().strftime('%H:%M on %d %b %Y')}"
+                )
+
+                return redirect(url_for("home"))
             error = "Wrong username or password. Try again."
 
     return render_template("login.html", error=error, info=info)
@@ -1179,19 +1260,19 @@ def signup():
         )
 
     conn.execute("""
-        INSERT INTO users (username, password_hash)
-        VALUES (?, ?)
+        INSERT INTO users (username, password_hash, approved)
+        VALUES (?, ?, 0)
     """, (username, hash_password(password)))
     conn.commit()
     conn.close()
 
     send_telegram(
-        f"🆕 <b>New Nku-OS Account</b>\n"
-        f"User <b>{username}</b> created\n"
+        f"🆕 <b>New Nku-OS signup (pending approval)</b>\n"
+        f"User <b>{username}</b> must be approved by admin\n"
         f"🕐 {datetime.now().strftime('%H:%M on %d %b %Y')}"
     )
 
-    return redirect(url_for("login", created="1"))
+    return redirect(url_for("login", pending="1"))
 
 
 @app.route("/logout")
@@ -1206,6 +1287,126 @@ def logout():
     )
 
     return redirect(url_for("login"))
+
+@app.route("/admin/pending-users")
+@primary_admin_required
+def admin_pending_users():
+    conn = get_db()
+    try:
+        pending = conn.execute(
+            """
+            SELECT id, username, created_at FROM users
+            WHERE approved = 0
+            ORDER BY datetime(COALESCE(created_at, '1970-01-01')) ASC,
+                     id ASC
+            """
+        ).fetchall()
+        total_users = conn.execute(
+            "SELECT COUNT(*) FROM users"
+        ).fetchone()[0]
+        active_users = conn.execute(
+            "SELECT COUNT(*) FROM users WHERE IFNULL(approved, 1) = 1"
+        ).fetchone()[0]
+    finally:
+        conn.close()
+
+    return render_template(
+        "admin_accounts.html",
+        pending=pending,
+        total_users=total_users,
+        active_users=active_users,
+    )
+
+
+@app.route("/admin/approve-user/<int:user_id>", methods=["POST"])
+@primary_admin_required
+def admin_approve_user(user_id):
+    conn = get_db()
+    row = conn.execute(
+        "SELECT id, username, approved FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        flash("That account does not exist.", "warning")
+        return redirect(url_for("admin_pending_users"))
+
+    try:
+        ap_val = (
+            int(row["approved"]) if row["approved"] is not None else None
+        )
+    except (TypeError, ValueError):
+        ap_val = None
+
+    if ap_val == 1:
+        conn.close()
+        flash("That account was already approved.", "info")
+        return redirect(url_for("admin_pending_users"))
+
+    conn.execute(
+        "UPDATE users SET approved = 1 WHERE id = ?",
+        (user_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    send_telegram(
+        f"✅ <b>Nku-OS account approved</b>\n"
+        f"User <b>{row['username']}</b> may sign in"
+    )
+    flash(
+        f"You approved @{row['username']} — they can sign in now.",
+        "success",
+    )
+    return redirect(url_for("admin_pending_users"))
+
+
+@app.route("/admin/reject-user/<int:user_id>", methods=["POST"])
+@primary_admin_required
+def admin_reject_user(user_id):
+    conn = get_db()
+    row = conn.execute(
+        "SELECT id, username, approved FROM users WHERE id = ?",
+        (user_id,),
+    ).fetchone()
+    if not row:
+        conn.close()
+        flash("That account does not exist.", "warning")
+        return redirect(url_for("admin_pending_users"))
+
+    nu = LOGIN_USERNAME.strip().lower()
+    if row["username"] and row["username"].strip().lower() == nu:
+        conn.close()
+        flash("You cannot reject the primary administrator account.", "danger")
+        return redirect(url_for("admin_pending_users"))
+
+    try:
+        ap_val = (
+            int(row["approved"]) if row["approved"] is not None else None
+        )
+    except (TypeError, ValueError):
+        ap_val = None
+
+    if ap_val == 1:
+        conn.close()
+        flash(
+            "That user is already active. Reject only applies to pending requests.",
+            "warning",
+        )
+        return redirect(url_for("admin_pending_users"))
+
+    uname = row["username"]
+    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+
+    send_telegram(
+        f"❌ <b>Nku-OS signup rejected</b>\n"
+        f"Removed pending user <b>{uname}</b>"
+    )
+    flash(f"Rejected and removed @{uname}.", "success")
+    return redirect(url_for("admin_pending_users"))
+
 
 @app.route("/debug/storage")
 @login_required

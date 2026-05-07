@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">Account approvals</div>
+    <div class="page-subtitle">
+      New registrations stay pending until you approve them.
+      Logged-in as household admin (<b>{{ login_username }}</b>).
+    </div>
+  </div>
+  <div class="mobile-stack-row" style="display:flex; gap:0.5rem;">
+    <a href="/settings" class="btn btn-primary">← Settings</a>
+    <a href="/" class="btn btn-primary">Dashboard</a>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:1.25rem;">
+  <div class="card-title">Overview</div>
+  <div style="display:flex; gap:2rem; flex-wrap:wrap; font-size:0.92rem;">
+    <div><span style="color:var(--text-muted);">Total accounts:</span>
+      <b>{{ total_users }}</b></div>
+    <div><span style="color:var(--text-muted);">Approved (can sign in):</span>
+      <b>{{ active_users }}</b></div>
+    <div><span style="color:var(--text-muted);">Pending approval:</span>
+      <b>{{ pending|length }}</b></div>
+  </div>
+</div>
+
+{% if pending %}
+<div class="card">
+  <div class="card-title">Pending sign-ups</div>
+  <div style="display:flex; flex-direction:column; gap:0.75rem;">
+    {% for row in pending %}
+    <div class="dash-panel-row"
+         style="margin-bottom:0; display:flex;
+                flex-wrap:wrap; justify-content:space-between;
+                align-items:center; gap:0.75rem;">
+      <div>
+        <div style="font-weight:600;">{{ row.username }}</div>
+        <div style="font-size:0.78rem; color:var(--text-muted);
+                    margin-top:0.2rem;">
+          Requested: {{ row.created_at or '—' }}
+        </div>
+      </div>
+      <div style="display:flex; gap:0.45rem;">
+        <form action="/admin/approve-user/{{ row.id }}" method="POST"
+              style="margin:0;">
+          <button type="submit" class="btn btn-success btn-sm">
+            Approve
+          </button>
+        </form>
+        <form action="/admin/reject-user/{{ row.id }}" method="POST"
+              style="margin:0;"
+              onsubmit="return confirm(
+                'Remove @{{ row.username }}? They will have to register again.'
+              );">
+          <button type="submit" class="btn btn-danger btn-sm">
+            Reject
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-title">Pending sign-ups</div>
+  <div class="empty-state" style="padding:1.25rem;">
+    No accounts waiting for approval.
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

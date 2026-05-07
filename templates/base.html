@@ -568,6 +568,46 @@
             color            : #ffffff;
         }
 
+        .flash-stack {
+            margin-bottom : 1.1rem;
+            display       : flex;
+            flex-direction: column;
+            gap           : 0.55rem;
+        }
+
+        .flash-msg {
+            padding       : 0.72rem 0.95rem;
+            border-radius : 11px;
+            font-size     : 0.86rem;
+            font-weight   : 500;
+            border        : 1px solid transparent;
+            line-height   : 1.4;
+        }
+
+        .flash-success {
+            background : rgba(81,207,102,0.12);
+            border-color : rgba(81,207,102,0.35);
+            color      : #51cf66;
+        }
+
+        .flash-danger {
+            background : rgba(255,107,107,0.1);
+            border-color : rgba(255,107,107,0.35);
+            color      : #ff6b6b;
+        }
+
+        .flash-warning {
+            background : rgba(252,196,25,0.12);
+            border-color : rgba(252,196,25,0.35);
+            color      : #fcc419;
+        }
+
+        .flash-info {
+            background : rgba(79,158,255,0.12);
+            border-color : rgba(79,158,255,0.3);
+            color      : var(--text-brand);
+        }
+
         /* =====================================================
            THEME TOGGLE
         ===================================================== */
@@ -1513,6 +1553,31 @@
                         </a>
                     </div>
                 </div>
+
+                {% if is_primary_admin %}
+                <div class="menu-settings-card" role="navigation"
+                     aria-label="Household admin">
+                    <div class="menu-settings-card-head">Accounts</div>
+                    <p style="font-size:0.74rem;color:var(--text-muted);
+                              margin:-0.2rem 0 0.5rem;line-height:1.35;">
+                        Approve family sign-ups ({{ login_username }} only).
+                    </p>
+                    <a class="menu-settings-intro"
+                       href="/admin/pending-users"
+                       onclick="document.getElementById('hamburger-menu')
+                                  .classList.remove('open');"
+                       style="margin-bottom:0;">
+                        <span class="menu-settings-intro-badge"
+                              aria-hidden="true">👥</span>
+                        <span class="menu-settings-intro-copy">
+                            <strong>Approve accounts</strong>
+                            <small>Pending registrations</small>
+                        </span>
+                        <span class="menu-settings-intro-chev"
+                              aria-hidden="true">›</span>
+                    </a>
+                </div>
+                {% endif %}
             </div>
         </details>
 
@@ -1531,6 +1596,15 @@
     </div>
 
     <div class="container">
+        {% with flashes = get_flashed_messages(with_categories=true) %}
+        {% if flashes %}
+        <div class="flash-stack" role="alert">
+            {% for cat, txt in flashes %}
+            <div class="flash-msg flash-{{ cat }}">{{ txt }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
         {% block content %}{% endblock %}
     </div>
 

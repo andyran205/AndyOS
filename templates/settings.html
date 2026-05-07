@@ -10,6 +10,21 @@
 </div>
 
 <div class="grid-2">
+  {% if is_primary_admin %}
+  <div class="card">
+    <div class="card-title">Accounts &amp; access</div>
+    <p style="color:var(--text-muted); font-size:0.88rem;
+              margin-bottom:0.85rem;line-height:1.45;">
+      You are signed in as the primary administrator
+      (<b>{{ login_username }}</b>). Review new registrations before those
+      users can open the dashboard.
+    </p>
+    <a class="btn btn-primary" href="/admin/pending-users">
+      Review pending accounts
+    </a>
+  </div>
+  {% endif %}
+
   <div class="card">
     <div class="card-title">Dashboard</div>
 
