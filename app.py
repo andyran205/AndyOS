@@ -4,6 +4,7 @@ from flask import (
 )
 import sqlite3
 import os
+import json
 import requests
 import threading
 import time
@@ -23,6 +24,27 @@ app.secret_key = os.environ.get(
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH  = os.path.join(BASE_DIR, "database.db")
+BACKUP_DIR = os.path.join(os.path.expanduser("~"), ".andyos")
+INVENTORY_BACKUP_PATH = os.path.join(BACKUP_DIR, "inventory_backup.json")
+DEFAULT_INVENTORY_ITEMS = [
+    {"name": "Electricity bill", "category": "Utilities", "item_type": "service", "frequency_days": 30},
+    {"name": "Water bill", "category": "Utilities", "item_type": "service", "frequency_days": 30},
+    {"name": "Diesel", "category": "Utilities", "item_type": "quantifiable", "unit": "L", "current_stock": 0, "regular_stock": 0},
+    {"name": "Septic", "category": "Maintenance", "item_type": "service", "frequency_days": 90},
+    {"name": "Fish tank", "category": "Maintenance", "item_type": "service", "frequency_days": 30},
+    {"name": "Fish food", "category": "Pet", "item_type": "quantifiable", "unit": "packs", "current_stock": 0, "regular_stock": 0},
+    {"name": "Dog food Can", "category": "Pet", "item_type": "quantifiable", "unit": "cans", "current_stock": 0, "regular_stock": 0},
+    {"name": "Dog food", "category": "Pet", "item_type": "quantifiable", "unit": "kg", "current_stock": 0, "regular_stock": 0},
+    {"name": "Gas", "category": "Utilities", "item_type": "quantifiable", "unit": "kg", "current_stock": 0, "regular_stock": 0},
+    {"name": "Fumigation", "category": "Maintenance", "item_type": "service", "frequency_days": 90},
+    {"name": "Waste disposal", "category": "Utilities", "item_type": "service", "frequency_days": 30},
+    {"name": "Internet", "category": "Utilities", "item_type": "service", "frequency_days": 30},
+    {"name": "Dstv", "category": "Utilities", "item_type": "service", "frequency_days": 30},
+    {"name": "Drinking water", "category": "Utilities", "item_type": "quantifiable", "unit": "L", "current_stock": 0, "regular_stock": 0},
+    {"name": "AC servicing", "category": "Maintenance", "item_type": "service", "frequency_days": 90},
+    {"name": "Manhole Servic", "category": "Maintenance", "item_type": "service", "frequency_days": 180},
+    {"name": "Microwave", "category": "Maintenance", "item_type": "service", "frequency_days": 180},
+]
 
 
 # ============================================================
@@ -510,8 +532,166 @@ def init_db():
     """)
 
     conn.commit()
+
+    restore_inventory_from_backup_if_empty(conn)
+    ensure_default_inventory_items(conn)
+    backup_inventory(conn)
+
     conn.close()
     print("Database ready at:", DB_PATH)
+
+
+def _inventory_row_to_dict(row):
+    return {
+        "name": row["name"],
+        "category": row["category"],
+        "item_type": row["item_type"] or "quantifiable",
+        "track_mode": row["track_mode"] or "manual",
+        "current_stock": row["current_stock"],
+        "regular_stock": row["regular_stock"],
+        "unit": row["unit"],
+        "renewal_date": row["renewal_date"],
+        "last_service_date": row["last_service_date"],
+        "frequency_days": row["frequency_days"],
+        "avg_cost": row["avg_cost"],
+        "avg_daily_use": row["avg_daily_use"],
+        "quick_deduct_1": row["quick_deduct_1"],
+        "quick_deduct_2": row["quick_deduct_2"],
+        "last_refill_date": row["last_refill_date"],
+        "notes": row["notes"],
+    }
+
+
+def backup_inventory(conn=None):
+    own_connection = conn is None
+    if own_connection:
+        conn = get_db()
+
+    try:
+        rows = conn.execute(
+            "SELECT * FROM inventory ORDER BY name"
+        ).fetchall()
+        payload = {
+            "exported_at": datetime.now().isoformat(),
+            "item_count": len(rows),
+            "items": [_inventory_row_to_dict(row) for row in rows],
+        }
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        with open(INVENTORY_BACKUP_PATH, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+    except Exception as e:
+        print(f"Inventory backup failed: {e}")
+    finally:
+        if own_connection and conn is not None:
+            conn.close()
+
+
+def restore_inventory_from_backup_if_empty(conn):
+    count = conn.execute(
+        "SELECT COUNT(*) FROM inventory"
+    ).fetchone()[0]
+
+    if count > 0 or not os.path.exists(INVENTORY_BACKUP_PATH):
+        return
+
+    try:
+        with open(INVENTORY_BACKUP_PATH, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+
+        items = payload.get("items", [])
+        for item in items:
+            conn.execute("""
+                INSERT INTO inventory
+                (name, category, item_type, track_mode, current_stock,
+                 regular_stock, unit, renewal_date, last_service_date,
+                 frequency_days, avg_cost, avg_daily_use, quick_deduct_1,
+                 quick_deduct_2, last_refill_date, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                item.get("name"),
+                item.get("category"),
+                item.get("item_type", "quantifiable"),
+                item.get("track_mode", "manual"),
+                item.get("current_stock"),
+                item.get("regular_stock"),
+                item.get("unit"),
+                item.get("renewal_date"),
+                item.get("last_service_date"),
+                item.get("frequency_days"),
+                item.get("avg_cost"),
+                item.get("avg_daily_use"),
+                item.get("quick_deduct_1"),
+                item.get("quick_deduct_2"),
+                item.get("last_refill_date"),
+                item.get("notes"),
+            ))
+
+        conn.commit()
+        print(
+            f"Restored {len(items)} inventory item(s) "
+            f"from {INVENTORY_BACKUP_PATH}"
+        )
+    except Exception as e:
+        print(f"Inventory restore failed: {e}")
+
+
+def ensure_default_inventory_items(conn):
+    try:
+        existing_names = {
+            row["name"].strip().lower()
+            for row in conn.execute("SELECT name FROM inventory").fetchall()
+            if row["name"]
+        }
+
+        inserted = 0
+        for item in DEFAULT_INVENTORY_ITEMS:
+            normalized_name = item["name"].strip().lower()
+            if normalized_name in existing_names:
+                continue
+
+            if item["item_type"] == "service":
+                conn.execute("""
+                    INSERT INTO inventory
+                    (name, category, item_type, track_mode, last_service_date,
+                     frequency_days, avg_cost, notes)
+                    VALUES (?, ?, 'service', 'manual', ?, ?, ?, ?)
+                """, (
+                    item["name"],
+                    item["category"],
+                    None,
+                    int(item.get("frequency_days", 30)),
+                    None,
+                    "Seeded default item",
+                ))
+            else:
+                conn.execute("""
+                    INSERT INTO inventory
+                    (name, category, item_type, track_mode, current_stock,
+                     regular_stock, unit, renewal_date, avg_daily_use,
+                     quick_deduct_1, quick_deduct_2, last_refill_date, notes)
+                    VALUES (?, ?, 'quantifiable', 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    item["name"],
+                    item["category"],
+                    float(item.get("current_stock", 0)),
+                    float(item.get("regular_stock", 0)),
+                    item.get("unit", "unit"),
+                    None,
+                    None,
+                    None,
+                    None,
+                    str(date.today()),
+                    "Seeded default item",
+                ))
+
+            existing_names.add(normalized_name)
+            inserted += 1
+
+        if inserted > 0:
+            conn.commit()
+            print(f"Inserted {inserted} default inventory item(s).")
+    except Exception as e:
+        print(f"Default inventory seed failed: {e}")
 
 
 # ============================================================
@@ -798,6 +978,7 @@ def deduct_stock(item_id):
         ))
 
         conn.commit()
+        backup_inventory(conn)
 
         # Check if just went below 25%
         if item["regular_stock"] and item["regular_stock"] > 0:
@@ -842,6 +1023,7 @@ def refill_stock(item_id):
         """, (new_stock, str(date.today()), item_id))
 
         conn.commit()
+        backup_inventory(conn)
 
         send_telegram(
             f"🛒 <b>Stock Refilled!</b>\n\n"
@@ -949,6 +1131,7 @@ def add_item():
             )
 
         conn.commit()
+        backup_inventory(conn)
         conn.close()
         return redirect(url_for("home"))
 
@@ -1004,6 +1187,7 @@ def log_service(item_id):
             ))
 
         conn.commit()
+        backup_inventory(conn)
         conn.close()
 
         send_telegram(
@@ -1195,6 +1379,7 @@ def edit_inventory(item_id):
             ))
 
         conn.commit()
+        backup_inventory(conn)
         conn.close()
 
         send_telegram(
@@ -1320,6 +1505,8 @@ def delete_item(table, item_id):
         f"DELETE FROM {table} WHERE id = ?", (item_id,)
     )
     conn.commit()
+    if table == "inventory":
+        backup_inventory(conn)
     conn.close()
 
     if item:
@@ -1375,6 +1562,7 @@ def update_stock(item_id):
         (float(new_stock), item_id)
     )
     conn.commit()
+    backup_inventory(conn)
     conn.close()
 
     return redirect(url_for("home"))
