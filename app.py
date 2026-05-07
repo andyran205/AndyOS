@@ -23,11 +23,37 @@ app.secret_key = os.environ.get(
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH  = os.path.join(BASE_DIR, "database.db")
-BACKUP_DIR = os.path.join(os.path.expanduser("~"), ".andyos")
-INVENTORY_BACKUP_PATH = os.path.join(BACKUP_DIR, "inventory_backup.json")
+def resolve_db_path():
+    configured_db = os.environ.get("DATABASE_PATH", "").strip()
+    if configured_db:
+        return (
+            configured_db
+            if os.path.isabs(configured_db)
+            else os.path.join(BASE_DIR, configured_db)
+        )
+
+    railway_volume = os.environ.get(
+        "RAILWAY_VOLUME_MOUNT_PATH", ""
+    ).strip()
+    if railway_volume:
+        return os.path.join(railway_volume, "database.db")
+
+    return os.path.join(BASE_DIR, "database.db")
+
+
+DB_PATH = resolve_db_path()
+BACKUP_DIR = os.environ.get("ANDYOS_BACKUP_DIR", "").strip()
+if not BACKUP_DIR:
+    BACKUP_DIR = (
+        os.path.join(os.path.dirname(DB_PATH), ".andyos")
+        if os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", "").strip()
+        else os.path.join(os.path.expanduser("~"), ".andyos")
+    )
+INVENTORY_BACKUP_PATH = os.path.join(
+    BACKUP_DIR, "inventory_backup.json"
+)
 DEFAULT_INVENTORY_ITEMS = [
-    {"name": "Electricity bill", "category": "Utilities", "item_type": "service", "frequency_days": 30},
+    {"name": "Electricity bill", "category": "Utilities", "item_type": "quantifiable", "unit": "kWh", "current_stock": 0, "regular_stock": 0},
     {"name": "Water bill", "category": "Utilities", "item_type": "service", "frequency_days": 30},
     {"name": "Diesel", "category": "Utilities", "item_type": "quantifiable", "unit": "L", "current_stock": 0, "regular_stock": 0},
     {"name": "Septic", "category": "Maintenance", "item_type": "service", "frequency_days": 90},
@@ -424,6 +450,7 @@ def start_scheduler():
 # ============================================================
 
 def get_db():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -534,6 +561,7 @@ def init_db():
     conn.commit()
 
     restore_inventory_from_backup_if_empty(conn)
+    migrate_electricity_bill_to_quantifiable(conn)
     ensure_default_inventory_items(conn)
     backup_inventory(conn)
 
@@ -692,6 +720,46 @@ def ensure_default_inventory_items(conn):
             print(f"Inserted {inserted} default inventory item(s).")
     except Exception as e:
         print(f"Default inventory seed failed: {e}")
+
+
+def migrate_electricity_bill_to_quantifiable(conn):
+    try:
+        existing = conn.execute("""
+            SELECT id, item_type, unit, current_stock, regular_stock
+            FROM inventory
+            WHERE LOWER(TRIM(name)) = 'electricity bill'
+            ORDER BY id ASC
+        """).fetchall()
+
+        if not existing:
+            return
+
+        updated = 0
+        for row in existing:
+            if row["item_type"] == "quantifiable":
+                continue
+
+            conn.execute("""
+                UPDATE inventory
+                SET item_type = 'quantifiable',
+                    track_mode = 'manual',
+                    unit = COALESCE(NULLIF(unit, ''), 'kWh'),
+                    current_stock = COALESCE(current_stock, 0),
+                    regular_stock = COALESCE(regular_stock, 0),
+                    last_service_date = NULL,
+                    frequency_days = NULL
+                WHERE id = ?
+            """, (row["id"],))
+            updated += 1
+
+        if updated > 0:
+            conn.commit()
+            print(
+                f"Migrated {updated} Electricity bill item(s) "
+                "to quantifiable."
+            )
+    except Exception as e:
+        print(f"Electricity bill migration failed: {e}")
 
 
 # ============================================================
