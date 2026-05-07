@@ -185,14 +185,27 @@
             top              : 68px;
             left             : 24px;
             right            : auto;
-            width            : 300px;
-            background-color : var(--bg-card);
-            border           : 1px solid var(--border);
-            border-radius    : 12px;
-            box-shadow       : 0 12px 30px var(--shadow);
-            padding          : 0.9rem;
+            width            : min(360px, calc(100vw - 48px));
+            background-color : rgba(26, 29, 39, 0.92);
+            backdrop-filter  : blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border           : 1px solid rgba(255, 255, 255, 0.08);
+            border-radius    : 16px;
+            box-shadow       : 0 16px 48px rgba(0, 0, 0, 0.45),
+                               0 0 0 1px rgba(79, 158, 255, 0.06) inset;
+            padding          : 0.85rem;
             z-index          : 1000;
             display          : none;
+            max-height       : calc(100vh - 88px);
+            overflow-y       : auto;
+            overflow-x       : hidden;
+        }
+
+        [data-theme="light"] .hamburger-menu {
+            background-color : rgba(255, 255, 255, 0.94);
+            border-color     : rgba(15, 17, 23, 0.08);
+            box-shadow       : 0 16px 40px rgba(15, 17, 23, 0.12),
+                               0 0 0 1px rgba(37, 99, 235, 0.05) inset;
         }
 
         .hamburger-menu.open { display: block; }
@@ -251,13 +264,286 @@
             border-color     : var(--border);
         }
 
-        .menu-toggle-row {
+        .menu-details-content.menu-settings-shell {
+            padding-left: 0;
+            margin-top   : 0.35rem;
+        }
+
+        .menu-settings-intro {
+            display         : flex;
+            align-items     : flex-start;
+            gap             : 0.65rem;
+            padding         : 0.65rem 0.72rem;
+            border-radius   : 12px;
+            background      : rgba(79, 158, 255, 0.08);
+            border          : 1px solid rgba(79, 158, 255, 0.18);
+            margin-bottom   : 0.75rem;
+            text-decoration : none;
+            color           : inherit;
+            transition      : border-color 0.2s, background 0.2s,
+                              transform 0.15s;
+        }
+
+        .menu-settings-intro:hover {
+            background   : rgba(79, 158, 255, 0.12);
+            border-color : rgba(79, 158, 255, 0.35);
+            transform    : translateY(-1px);
+        }
+
+        .menu-settings-intro-badge {
+            width         : 36px;
+            height        : 36px;
+            border-radius : 10px;
+            display       : grid;
+            place-items   : center;
+            flex-shrink   : 0;
+            font-size     : 1rem;
+            background    : rgba(212, 175, 55, 0.15);
+            border        : 1px solid rgba(212, 175, 55, 0.35);
+        }
+
+        .menu-settings-intro-copy strong {
+            display     : block;
+            font-size   : 0.88rem;
+            font-weight : 650;
+            color       : var(--text-main);
+        }
+
+        .menu-settings-intro-copy small {
+            display     : block;
+            font-size   : 0.74rem;
+            color       : var(--text-muted);
+            line-height : 1.35;
+            margin-top  : 0.2rem;
+        }
+
+        .menu-settings-intro-chev {
+            margin-left : auto;
+            align-self  : center;
+            color       : var(--text-muted);
+            font-size   : 0.9rem;
+        }
+
+        .menu-settings-card {
+            border-radius : 14px;
+            padding       : 0.72rem 0.65rem;
+            margin-bottom : 0.65rem;
+            background    : rgba(255, 255, 255, 0.03);
+            border        : 1px solid rgba(255, 255, 255, 0.07);
+            box-shadow    : 0 4px 16px rgba(0, 0, 0, 0.12);
+        }
+
+        [data-theme="light"] .menu-settings-card {
+            background   : rgba(15, 17, 23, 0.03);
+            border-color : rgba(15, 17, 23, 0.08);
+            box-shadow   : 0 4px 14px rgba(15, 17, 23, 0.06);
+        }
+
+        .menu-settings-card-head {
+            font-size      : 0.68rem;
+            font-weight    : 700;
+            letter-spacing : 0.12em;
+            text-transform : uppercase;
+            color          : rgba(212, 175, 55, 0.85);
+            margin-bottom  : 0.55rem;
+            padding-bottom : 0.45rem;
+            border-bottom  : 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        [data-theme="light"] .menu-settings-card-head {
+            color         : #b8860b;
+            border-bottom : 1px solid rgba(15, 17, 23, 0.08);
+        }
+
+        .menu-pref-rows {
+            display        : flex;
+            flex-direction : column;
+            gap            : 0.38rem;
+        }
+
+        .menu-switch-row {
             display         : flex;
             align-items     : center;
             justify-content : space-between;
-            font-size       : 0.84rem;
+            gap             : 0.55rem;
+            padding         : 0.52rem;
+            border-radius   : 11px;
+            cursor          : pointer;
+            border          : 1px solid transparent;
+            transition      : background 0.15s, border-color 0.15s;
+            position        : relative;
+        }
+
+        .menu-switch-row:hover {
+            background   : rgba(79, 158, 255, 0.06);
+            border-color : rgba(79, 158, 255, 0.12);
+        }
+
+        .menu-switch-row-text {
+            display     : flex;
+            align-items : center;
+            gap         : 0.55rem;
+            min-width   : 0;
+        }
+
+        .menu-switch-ico {
+            width         : 32px;
+            height        : 32px;
+            border-radius : 9px;
+            display       : grid;
+            place-items   : center;
+            flex-shrink   : 0;
+            font-size     : 0.95rem;
+            background    : rgba(255, 255, 255, 0.05);
+            border        : 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        [data-theme="light"] .menu-switch-ico {
+            background   : rgba(15, 17, 23, 0.04);
+            border-color : rgba(15, 17, 23, 0.08);
+        }
+
+        .menu-switch-row-text-inner span:first-child {
+            display     : block;
+            font-size   : 0.84rem;
+            font-weight : 575;
+            color       : var(--text-main);
+            line-height : 1.25;
+        }
+
+        .menu-switch-row-text-inner .menu-switch-hint {
+            display     : block;
+            font-size   : 0.68rem;
+            color       : var(--text-muted);
+            margin-top  : 0.12rem;
+            line-height : 1.3;
+            font-weight : 400;
+        }
+
+        .menu-switch-input {
+            position    : absolute;
+            opacity     : 0;
+            width       : 0;
+            height      : 0;
+            margin      : 0;
+        }
+
+        .menu-switch-track {
+            width          : 46px;
+            height         : 26px;
+            border-radius  : 999px;
+            flex-shrink    : 0;
+            background     : rgba(255, 255, 255, 0.1);
+            border         : 1px solid rgba(255, 255, 255, 0.12);
+            position       : relative;
+            transition     : background 0.22s ease, border-color 0.2s,
+                             box-shadow 0.22s ease;
+            box-shadow     : inset 0 2px 6px rgba(0, 0, 0, 0.22);
+        }
+
+        [data-theme="light"] .menu-switch-track {
+            background   : rgba(15, 17, 23, 0.08);
+            border-color : rgba(15, 17, 23, 0.12);
+        }
+
+        .menu-switch-track-knob {
+            position      : absolute;
+            width         : 20px;
+            height        : 20px;
+            border-radius : 50%;
+            top           : 2px;
+            left          : 3px;
+            background    : linear-gradient(165deg, #ffffff 0%, #e8ecf4 100%);
+            box-shadow    : 0 2px 8px rgba(0, 0, 0, 0.25);
+            transition    : transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .menu-switch-input:checked + .menu-switch-track {
+            background   : linear-gradient(135deg, #2563eb 0%,
+                              #3b82f6 48%, #1d4ed8 100%);
+            border-color : rgba(255, 255, 255, 0.28);
+            box-shadow   : inset 0 1px 0 rgba(255, 255, 255, 0.18),
+                           0 0 14px rgba(59, 130, 246, 0.45);
+        }
+
+        .menu-switch-input:checked + .menu-switch-track
+            .menu-switch-track-knob {
+            transform : translateX(20px);
+        }
+
+        .menu-switch-row:focus-within {
+            outline      : none;
+            border-color : rgba(79, 158, 255, 0.45);
+            background   : rgba(79, 158, 255, 0.08);
+        }
+
+        .menu-switch-input:focus-visible + .menu-switch-track {
+            outline    : none;
+            box-shadow : 0 0 0 2px var(--bg-card),
+                         0 0 0 4px rgba(79, 158, 255, 0.55);
+        }
+
+        .menu-settings-footer {
+            display        : flex;
+            flex-direction : column;
+            gap            : 0.42rem;
+            margin-top     : 0.25rem;
+        }
+
+        .menu-settings-btn-reset {
+            display         : flex;
+            align-items     : center;
+            justify-content : center;
+            gap             : 0.45rem;
+            width           : 100%;
+            padding         : 0.55rem 0.75rem;
+            border-radius   : 11px;
+            border          : 1px solid rgba(212, 175, 55, 0.35);
+            background      : rgba(212, 175, 55, 0.08);
             color           : var(--text-main);
-            padding         : 0.35rem 0;
+            font-size       : 0.82rem;
+            font-weight     : 600;
+            cursor          : pointer;
+            transition      : background 0.2s, border-color 0.2s,
+                             transform    0.15s;
+        }
+
+        .menu-settings-btn-reset:hover {
+            background   : rgba(212, 175, 55, 0.15);
+            border-color : rgba(212, 175, 55, 0.55);
+            transform    : translateY(-1px);
+        }
+
+        .menu-settings-links {
+            display               : grid;
+            grid-template-columns : 1fr 1fr;
+            gap                   : 0.45rem;
+        }
+
+        .menu-settings-mini-link {
+            display         : flex;
+            align-items     : center;
+            justify-content : center;
+            gap             : 0.35rem;
+            padding         : 0.48rem 0.42rem;
+            border-radius   : 10px;
+            font-size       : 0.76rem;
+            font-weight     : 575;
+            text-decoration : none;
+            color           : var(--text-main);
+            background      : rgba(255, 255, 255, 0.04);
+            border          : 1px solid rgba(255, 255, 255, 0.08);
+            transition      : background 0.15s, border-color 0.15s;
+        }
+
+        [data-theme="light"] .menu-settings-mini-link {
+            background   : rgba(15, 17, 23, 0.04);
+            border-color : rgba(15, 17, 23, 0.1);
+        }
+
+        .menu-settings-mini-link:hover {
+            border-color : rgba(79, 158, 255, 0.35);
+            background   : rgba(79, 158, 255, 0.1);
         }
 
         .menu-divider {
@@ -956,6 +1242,9 @@
                 width: auto;
                 max-width: none;
             }
+            .menu-settings-links {
+                grid-template-columns: 1fr;
+            }
             .grid-2, .grid-3, .grid-4 {
                 grid-template-columns : 1fr;
             }
@@ -1040,56 +1329,190 @@
 
         <details class="menu-details">
             <summary class="menu-link">⚙️ Settings</summary>
-            <div class="menu-details-content">
-                <a class="menu-link" href="/settings">Open Settings</a>
+            <div class="menu-details-content menu-settings-shell">
+                <a class="menu-settings-intro" href="/settings">
+                    <span class="menu-settings-intro-badge" aria-hidden="true">⚙️</span>
+                    <span class="menu-settings-intro-copy">
+                        <strong>Settings hub</strong>
+                        <small>Account, privacy, and integrations</small>
+                    </span>
+                    <span class="menu-settings-intro-chev" aria-hidden="true">›</span>
+                </a>
 
-                <div class="menu-section-title">Theme</div>
-                <div class="menu-link" style="cursor:pointer;" onclick="toggleTheme()">
-                    Toggle light / dark mode
+                <div class="menu-settings-card" role="group" aria-label="Appearance">
+                    <div class="menu-settings-card-head">Appearance</div>
+                    <label class="menu-switch-row">
+                        <span class="menu-switch-row-text">
+                            <span class="menu-switch-ico" aria-hidden="true">🌙</span>
+                            <span class="menu-switch-row-text-inner">
+                                <span>Dark interface</span>
+                                <span class="menu-switch-hint">Comfortable blacks &amp;
+                                    glass panels</span>
+                            </span>
+                        </span>
+                        <input type="checkbox"
+                               class="menu-switch-input"
+                               id="hm-theme-switch"
+                               data-sync-theme
+                               checked
+                               aria-label="Dark mode"
+                               onchange="applyTheme(this.checked ? 'dark' : 'light')">
+                        <span class="menu-switch-track">
+                            <span class="menu-switch-track-knob" aria-hidden="true"></span>
+                        </span>
+                    </label>
                 </div>
 
-                <div class="menu-section-title menu-divider">Dashboard Customize</div>
-                <label class="menu-toggle-row">
-                    <span>Show alerts</span>
-                    <input type="checkbox" data-pref="showAlerts" checked
-                           onchange="setDashboardPreference('showAlerts', this.checked)">
-                </label>
-                <label class="menu-toggle-row">
-                    <span>Show stats</span>
-                    <input type="checkbox" data-pref="showStats" checked
-                           onchange="setDashboardPreference('showStats', this.checked)">
-                </label>
-                <label class="menu-toggle-row">
-                    <span>Show search/filter</span>
-                    <input type="checkbox" data-pref="showSearch" checked
-                           onchange="setDashboardPreference('showSearch', this.checked)">
-                </label>
-                <label class="menu-toggle-row">
-                    <span>Show inventory card</span>
-                    <input type="checkbox" data-pref="showInventoryCard" checked
-                           onchange="setDashboardPreference('showInventoryCard', this.checked)">
-                </label>
-                <label class="menu-toggle-row">
-                    <span>Show services card</span>
-                    <input type="checkbox" data-pref="showServicesCard" checked
-                           onchange="setDashboardPreference('showServicesCard', this.checked)">
-                </label>
-                <label class="menu-toggle-row">
-                    <span>Show reminders card</span>
-                    <input type="checkbox" data-pref="showRemindersCard" checked
-                           onchange="setDashboardPreference('showRemindersCard', this.checked)">
-                </label>
-                <label class="menu-toggle-row">
-                    <span>Show expenses card</span>
-                    <input type="checkbox" data-pref="showExpensesCard" checked
-                           onchange="setDashboardPreference('showExpensesCard', this.checked)">
-                </label>
-                <button class="menu-link" style="cursor:pointer;"
-                        onclick="resetDashboardPreferences()">
-                    ↺ Reset Dashboard Layout
-                </button>
-                <a class="menu-link" href="/debug/storage">Storage debug / restore</a>
-                <a class="menu-link" href="/export/json">Download full export (JSON)</a>
+                <div class="menu-settings-card" role="group"
+                     aria-label="Dashboard visibility">
+                    <div class="menu-settings-card-head">Dashboard layout</div>
+                    <div class="menu-pref-rows">
+                        <label class="menu-switch-row">
+                            <span class="menu-switch-row-text">
+                                <span class="menu-switch-ico" aria-hidden="true">⚠️</span>
+                                <span class="menu-switch-row-text-inner">
+                                    <span>Warnings ribbon</span>
+                                    <span class="menu-switch-hint">Alerts under the date line</span>
+                                </span>
+                            </span>
+                            <input type="checkbox"
+                                   class="menu-switch-input"
+                                   data-pref="showAlerts" checked
+                                   aria-label="Show alerts"
+                                   onchange="setDashboardPreference('showAlerts', this.checked)">
+                            <span class="menu-switch-track">
+                                <span class="menu-switch-track-knob" aria-hidden="true"></span>
+                            </span>
+                        </label>
+                        <label class="menu-switch-row">
+                            <span class="menu-switch-row-text">
+                                <span class="menu-switch-ico" aria-hidden="true">📊</span>
+                                <span class="menu-switch-row-text-inner">
+                                    <span>Stat strip</span>
+                                    <span class="menu-switch-hint">Totals &amp;
+                                        monthly glance</span>
+                                </span>
+                            </span>
+                            <input type="checkbox"
+                                   class="menu-switch-input"
+                                   data-pref="showStats" checked
+                                   aria-label="Show stats"
+                                   onchange="setDashboardPreference('showStats', this.checked)">
+                            <span class="menu-switch-track">
+                                <span class="menu-switch-track-knob" aria-hidden="true"></span>
+                            </span>
+                        </label>
+                        <label class="menu-switch-row">
+                            <span class="menu-switch-row-text">
+                                <span class="menu-switch-ico" aria-hidden="true">⌕</span>
+                                <span class="menu-switch-row-text-inner">
+                                    <span>Search &amp; filters</span>
+                                    <span class="menu-switch-hint">Nav search bar</span>
+                                </span>
+                            </span>
+                            <input type="checkbox"
+                                   class="menu-switch-input"
+                                   data-pref="showSearch" checked
+                                   aria-label="Show search filter"
+                                   onchange="setDashboardPreference('showSearch', this.checked)">
+                            <span class="menu-switch-track">
+                                <span class="menu-switch-track-knob" aria-hidden="true"></span>
+                            </span>
+                        </label>
+                        <label class="menu-switch-row">
+                            <span class="menu-switch-row-text">
+                                <span class="menu-switch-ico" aria-hidden="true">📦</span>
+                                <span class="menu-switch-row-text-inner">
+                                    <span>Inventory</span>
+                                    <span class="menu-switch-hint">Stock dashboard card</span>
+                                </span>
+                            </span>
+                            <input type="checkbox"
+                                   class="menu-switch-input"
+                                   data-pref="showInventoryCard" checked
+                                   aria-label="Show inventory card"
+                                   onchange="setDashboardPreference(
+                                       'showInventoryCard', this.checked)">
+                            <span class="menu-switch-track">
+                                <span class="menu-switch-track-knob" aria-hidden="true"></span>
+                            </span>
+                        </label>
+                        <label class="menu-switch-row">
+                            <span class="menu-switch-row-text">
+                                <span class="menu-switch-ico" aria-hidden="true">🔧</span>
+                                <span class="menu-switch-row-text-inner">
+                                    <span>Services</span>
+                                    <span class="menu-switch-hint">Maintenance &amp;
+                                        recurring jobs</span>
+                                </span>
+                            </span>
+                            <input type="checkbox"
+                                   class="menu-switch-input"
+                                   data-pref="showServicesCard" checked
+                                   aria-label="Show services card"
+                                   onchange="setDashboardPreference(
+                                       'showServicesCard', this.checked)">
+                            <span class="menu-switch-track">
+                                <span class="menu-switch-track-knob" aria-hidden="true"></span>
+                            </span>
+                        </label>
+                        <label class="menu-switch-row">
+                            <span class="menu-switch-row-text">
+                                <span class="menu-switch-ico" aria-hidden="true">🔔</span>
+                                <span class="menu-switch-row-text-inner">
+                                    <span>Reminders</span>
+                                    <span class="menu-switch-hint">Pending tasks list</span>
+                                </span>
+                            </span>
+                            <input type="checkbox"
+                                   class="menu-switch-input"
+                                   data-pref="showRemindersCard" checked
+                                   aria-label="Show reminders card"
+                                   onchange="setDashboardPreference(
+                                       'showRemindersCard', this.checked)">
+                            <span class="menu-switch-track">
+                                <span class="menu-switch-track-knob" aria-hidden="true"></span>
+                            </span>
+                        </label>
+                        <label class="menu-switch-row">
+                            <span class="menu-switch-row-text">
+                                <span class="menu-switch-ico" aria-hidden="true">💰</span>
+                                <span class="menu-switch-row-text-inner">
+                                    <span>Recent expenses</span>
+                                    <span class="menu-switch-hint">Latest spends table</span>
+                                </span>
+                            </span>
+                            <input type="checkbox"
+                                   class="menu-switch-input"
+                                   data-pref="showExpensesCard" checked
+                                   aria-label="Show expenses card"
+                                   onchange="setDashboardPreference(
+                                       'showExpensesCard', this.checked)">
+                            <span class="menu-switch-track">
+                                <span class="menu-switch-track-knob" aria-hidden="true"></span>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="menu-settings-footer">
+                    <button type="button"
+                            class="menu-settings-btn-reset"
+                            onclick="resetDashboardPreferences();">
+                        <span aria-hidden="true">↻</span>
+                        Restore default layout
+                    </button>
+                    <div class="menu-settings-links">
+                        <a class="menu-settings-mini-link"
+                           href="/debug/storage">
+                            💾&nbsp; Storage
+                        </a>
+                        <a class="menu-settings-mini-link"
+                           href="/export/json">
+                            ⬇&nbsp; Export JSON
+                        </a>
+                    </div>
+                </div>
             </div>
         </details>
 
@@ -1195,23 +1618,27 @@
 
         // ── Load saved theme on every page ──────────────────
         (function() {
-            const saved = localStorage.getItem("andyos-theme")
-                          || "dark";
-            document.documentElement.setAttribute(
-                "data-theme", saved
-            );
-            updateIcon(saved);
+            const saved = localStorage.getItem("andyos-theme") || "dark";
+            applyTheme(saved);
             applyDashboardPreferences();
         })();
 
         // ── Toggle between dark and light ───────────────────
         function toggleTheme() {
-            const html    = document.documentElement;
-            const current = html.getAttribute("data-theme");
-            const next    = current === "dark" ? "light" : "dark";
-            html.setAttribute("data-theme", next);
-            localStorage.setItem("andyos-theme", next);
-            updateIcon(next);
+            const cur = document.documentElement.getAttribute("data-theme")
+                        || "dark";
+            applyTheme(cur === "dark" ? "light" : "dark");
+        }
+
+        function applyTheme(theme) {
+            const use = theme === "light" ? "light" : "dark";
+            document.documentElement.setAttribute("data-theme", use);
+            localStorage.setItem("andyos-theme", use);
+            updateIcon(use);
+
+            document.querySelectorAll("[data-sync-theme]").forEach((el) => {
+                el.checked = use === "dark";
+            });
         }
 
         // ── Update moon/sun icons ────────────────────────────
