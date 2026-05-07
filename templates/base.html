@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AndyOS</title>
+    <title>Nku-OS</title>
     <style>
 
         /* =====================================================
@@ -85,15 +85,57 @@
         }
 
         .nav-brand {
-            font-size       : 1.4rem;
-            font-weight     : 700;
-            color           : var(--text-brand);
+            display         : inline-flex;
+            align-items     : center;
+            gap             : 0.65rem;
             text-decoration : none;
             margin-right    : 0.5rem;
         }
 
-        .nav-brand span {
-            color : var(--text-main);
+        .brand-mark {
+            width        : 34px;
+            height       : 34px;
+            border-radius: 10px;
+            display      : grid;
+            place-items  : center;
+            border       : 1px solid rgba(212, 175, 55, 0.45);
+            background   : radial-gradient(120% 120% at 20% 20%,
+                            rgba(255, 228, 150, 0.28) 0%,
+                            rgba(212, 175, 55, 0.12) 35%,
+                            rgba(15, 17, 23, 0.0) 70%),
+                          linear-gradient(180deg,
+                            rgba(212, 175, 55, 0.18),
+                            rgba(212, 175, 55, 0.05));
+            box-shadow   : 0 8px 18px rgba(0,0,0,0.25);
+        }
+
+        .brand-monogram {
+            font-weight   : 800;
+            letter-spacing: 0.06em;
+            font-size     : 0.72rem;
+            color         : #d4af37;
+        }
+
+        .brand-wordmark {
+            display       : flex;
+            flex-direction: column;
+            line-height   : 1.05;
+        }
+
+        .brand-name {
+            font-size     : 1.05rem;
+            font-weight   : 800;
+            letter-spacing: 0.02em;
+            background    : linear-gradient(90deg, #f7e7a9 0%, #d4af37 40%, #b8860b 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color         : transparent;
+        }
+
+        .brand-tagline {
+            font-size : 0.72rem;
+            color     : var(--text-muted);
+            letter-spacing: 0.02em;
         }
 
         .nav-links {
@@ -685,10 +727,19 @@
                     title="Open menu">
                 ☰
             </button>
-            <a href="/" class="nav-brand">Andy<span>OS</span></a>
+            <a href="/" class="nav-brand" aria-label="Nku-OS home">
+                <span class="brand-mark" aria-hidden="true">
+                    <span class="brand-monogram">NKU</span>
+                </span>
+                <span class="brand-wordmark">
+                    <span class="brand-name">Nku-OS</span>
+                    <span class="brand-tagline">Home OS</span>
+                </span>
+            </a>
         </div>
 
         <div class="nav-right">
+            {% block nav_extra %}{% endblock %}
         </div>
     </nav>
 

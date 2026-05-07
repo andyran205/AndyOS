@@ -256,7 +256,7 @@ def build_daily_briefing():
 
     lines = [
         f"🌅 <b>Good Morning Andy!</b>",
-        f"🏠 <b>AndyOS Daily Briefing</b>",
+        f"🏠 <b>Nku-OS Daily Briefing</b>",
         f"📅 {day_name}, {date_str}",
         ""
     ]
@@ -501,6 +501,8 @@ def init_db():
             frequency_days INTEGER,
             avg_cost REAL,
             avg_daily_use REAL,
+            avg_daily_value REAL,
+            avg_daily_value_unit TEXT,
             quick_deduct_1 REAL,
             quick_deduct_2 REAL,
             last_refill_date TEXT,
@@ -518,6 +520,8 @@ def init_db():
         ("frequency_days",   "INTEGER"),
         ("avg_cost",         "REAL"),
         ("avg_daily_use",    "REAL"),
+        ("avg_daily_value",  "REAL"),
+        ("avg_daily_value_unit", "TEXT"),
         ("quick_deduct_1",   "REAL"),
         ("quick_deduct_2",   "REAL"),
         ("last_refill_date", "TEXT"),
@@ -574,6 +578,10 @@ def init_db():
             due_date TEXT NOT NULL,
             priority TEXT NOT NULL,
             done INTEGER DEFAULT 0,
+            recurrence TEXT,
+            interval_minutes INTEGER,
+            day_of_week INTEGER,
+            day_of_month INTEGER,
             notes TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
@@ -594,6 +602,21 @@ def init_db():
             sent_at TEXT NOT NULL
         )
     """)
+
+    # Add new columns to existing reminders database if upgrading
+    reminder_columns = [
+        ("recurrence",       "TEXT"),
+        ("interval_minutes", "INTEGER"),
+        ("day_of_week",      "INTEGER"),
+        ("day_of_month",     "INTEGER"),
+    ]
+    for col_name, col_def in reminder_columns:
+        try:
+            cursor.execute(
+                f"ALTER TABLE reminders ADD COLUMN {col_name} {col_def}"
+            )
+        except:
+            pass
 
     conn.commit()
 
@@ -635,6 +658,8 @@ def _inventory_row_to_dict(row):
         "frequency_days": row["frequency_days"],
         "avg_cost": row["avg_cost"],
         "avg_daily_use": row["avg_daily_use"],
+        "avg_daily_value": row["avg_daily_value"],
+        "avg_daily_value_unit": row["avg_daily_value_unit"],
         "quick_deduct_1": row["quick_deduct_1"],
         "quick_deduct_2": row["quick_deduct_2"],
         "last_refill_date": row["last_refill_date"],
@@ -777,15 +802,18 @@ def ensure_default_inventory_items(conn):
                     INSERT INTO inventory
                     (name, category, item_type, track_mode, current_stock,
                      regular_stock, unit, renewal_date, avg_daily_use,
+                     avg_daily_value, avg_daily_value_unit,
                      quick_deduct_1, quick_deduct_2, last_refill_date,
                      last_refill_at, notes)
-                    VALUES (?, ?, 'quantifiable', 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, 'quantifiable', 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     item["name"],
                     item["category"],
                     float(item.get("current_stock", 0)),
                     float(item.get("regular_stock", 0)),
                     item.get("unit", "unit"),
+                    None,
+                    None,
                     None,
                     None,
                     None,
@@ -918,7 +946,7 @@ def check_and_alert():
     conn.close()
 
     if low_stock_msgs or overdue_msgs or service_msgs:
-        lines = ["🏠 <b>AndyOS Alert</b>"]
+        lines = ["🏠 <b>Nku-OS Alert</b>"]
 
         if low_stock_msgs:
             lines.append("")
@@ -1005,7 +1033,7 @@ def login():
             session["username"]  = username
 
             send_telegram(
-                f"🔐 <b>AndyOS Login</b>\n"
+                f"🔐 <b>Nku-OS Login</b>\n"
                 f"User <b>{username}</b> logged in\n"
                 f"🕐 {datetime.now().strftime('%H:%M on %d %b %Y')}"
             )
@@ -1066,7 +1094,7 @@ def signup():
     conn.close()
 
     send_telegram(
-        f"🆕 <b>New AndyOS Account</b>\n"
+        f"🆕 <b>New Nku-OS Account</b>\n"
         f"User <b>{username}</b> created\n"
         f"🕐 {datetime.now().strftime('%H:%M on %d %b %Y')}"
     )
@@ -1080,7 +1108,7 @@ def logout():
     session.clear()
 
     send_telegram(
-        f"🔓 <b>AndyOS Logout</b>\n"
+        f"🔓 <b>Nku-OS Logout</b>\n"
         f"User <b>{username}</b> logged out\n"
         f"🕐 {datetime.now().strftime('%H:%M on %d %b %Y')}"
     )
@@ -1121,7 +1149,7 @@ def debug_storage():
 
     return f"""
     <div style="font-family:Segoe UI, Tahoma, sans-serif; padding:18px;">
-      <h2 style="margin:0 0 10px;">AndyOS Storage Debug</h2>
+      <h2 style="margin:0 0 10px;">Nku-OS Storage Debug</h2>
       <div style="color:#6b7280; margin-bottom:14px;">
         This page shows the <b>active</b> database path and backup file so you can confirm you’re looking at the right data.
       </div>
@@ -1350,6 +1378,44 @@ def home():
 # ROUTES — QUICK DEDUCT / REFILL
 # ============================================================
 
+@app.route("/inventory/<int:item_id>")
+@login_required
+def inventory_detail(item_id):
+    conn = get_db()
+    try:
+        item = conn.execute(
+            "SELECT * FROM inventory WHERE id = ?", (item_id,)
+        ).fetchone()
+        if not item:
+            return redirect(url_for("home"))
+
+        if item["item_type"] != "quantifiable":
+            return redirect(url_for("home"))
+
+        current = get_calculated_stock(item)
+        days_left = get_days_until_empty(current, item["avg_daily_use"])
+        pct = 0
+        if item["regular_stock"] and item["regular_stock"] > 0:
+            pct = min(int((current / item["regular_stock"]) * 100), 100)
+
+        usage = conn.execute("""
+            SELECT * FROM usage_log
+            WHERE inventory_id = ?
+            ORDER BY id DESC
+            LIMIT 15
+        """, (item_id,)).fetchall()
+    finally:
+        conn.close()
+
+    return render_template(
+        "inventory_detail.html",
+        item=item,
+        current=current,
+        days_left=days_left,
+        pct=pct,
+        usage=usage,
+    )
+
 @app.route("/deduct/<int:item_id>", methods=["POST"])
 @login_required
 def deduct_stock(item_id):
@@ -1398,7 +1464,8 @@ def deduct_stock(item_id):
                 )
 
     conn.close()
-    return redirect(url_for("home"))
+    ref = request.referrer or ""
+    return redirect(ref if ("/inventory/" in ref) else url_for("home"))
 
 
 @app.route("/refill/<int:item_id>", methods=["POST"])
@@ -1442,7 +1509,8 @@ def refill_stock(item_id):
         )
 
     conn.close()
-    return redirect(url_for("home"))
+    ref = request.referrer or ""
+    return redirect(ref if ("/inventory/" in ref) else url_for("home"))
 
 
 # ============================================================
@@ -1478,6 +1546,12 @@ def add_item():
             avg_daily_use  = request.form.get(
                 "avg_daily_use", ""
             ).strip()
+            avg_daily_value = request.form.get(
+                "avg_daily_value", ""
+            ).strip()
+            avg_daily_value_unit = request.form.get(
+                "avg_daily_value_unit", ""
+            ).strip()
             quick_deduct_1 = request.form.get(
                 "quick_deduct_1", ""
             ).strip()
@@ -1490,14 +1564,17 @@ def add_item():
                 (name, category, item_type, track_mode,
                  current_stock, regular_stock, unit,
                  renewal_date, avg_daily_use,
+                 avg_daily_value, avg_daily_value_unit,
                  quick_deduct_1, quick_deduct_2,
                  last_refill_date, last_refill_at, notes)
-                VALUES (?, ?, 'quantifiable', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, 'quantifiable', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 name, category, track_mode,
                 float(current_stock), float(regular_stock),
                 unit, renewal_date or None,
                 float(avg_daily_use) if avg_daily_use else None,
+                float(avg_daily_value) if avg_daily_value else None,
+                (avg_daily_value_unit or None),
                 float(quick_deduct_1) if quick_deduct_1 else None,
                 float(quick_deduct_2) if quick_deduct_2 else None,
                 str(date.today()),
@@ -1676,6 +1753,10 @@ def add_reminder():
         title    = request.form.get("title", "").strip()
         due_date = request.form.get("due_date", "").strip()
         priority = request.form.get("priority", "medium").strip()
+        recurrence = request.form.get("recurrence", "none").strip()
+        interval_minutes_raw = request.form.get("interval_minutes", "").strip()
+        day_of_week_raw = request.form.get("day_of_week", "").strip()
+        day_of_month_raw = request.form.get("day_of_month", "").strip()
         notes    = request.form.get("notes", "").strip()
 
         if not title or not due_date:
@@ -1685,12 +1766,43 @@ def add_reminder():
                 section="reminder"
             )
 
+        interval_minutes = None
+        day_of_week = None
+        day_of_month = None
+        if recurrence == "minutes":
+            try:
+                interval_minutes = int(interval_minutes_raw)
+                if interval_minutes < 1:
+                    interval_minutes = None
+            except:
+                interval_minutes = None
+        if recurrence == "weekly":
+            try:
+                day_of_week = int(day_of_week_raw)
+                if day_of_week < 0 or day_of_week > 6:
+                    day_of_week = None
+            except:
+                day_of_week = None
+        if recurrence == "monthly":
+            try:
+                day_of_month = int(day_of_month_raw)
+                if day_of_month < 1 or day_of_month > 31:
+                    day_of_month = None
+            except:
+                day_of_month = None
+
         conn = get_db()
         conn.execute("""
             INSERT INTO reminders
-            (title, due_date, priority, notes)
-            VALUES (?, ?, ?, ?)
-        """, (title, due_date, priority, notes or None))
+            (title, due_date, priority, recurrence,
+             interval_minutes, day_of_week, day_of_month, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            title, due_date, priority,
+            (recurrence if recurrence != "none" else None),
+            interval_minutes, day_of_week, day_of_month,
+            notes or None
+        ))
         conn.commit()
         conn.close()
 
@@ -1702,6 +1814,7 @@ def add_reminder():
             f"{emoji} <b>{title}</b>\n"
             f"Due: {due_date}\n"
             f"Priority: {priority.capitalize()}"
+            + (f"\nRepeats: {recurrence}" if recurrence and recurrence != "none" else "")
         )
 
         return redirect(url_for("home"))
@@ -1743,6 +1856,12 @@ def edit_inventory(item_id):
             avg_daily_use  = request.form.get(
                 "avg_daily_use", ""
             ).strip()
+            avg_daily_value = request.form.get(
+                "avg_daily_value", ""
+            ).strip()
+            avg_daily_value_unit = request.form.get(
+                "avg_daily_value_unit", ""
+            ).strip()
             track_mode     = request.form.get(
                 "track_mode", "manual"
             )
@@ -1757,7 +1876,8 @@ def edit_inventory(item_id):
                 UPDATE inventory
                 SET name=?, category=?, current_stock=?,
                     regular_stock=?, unit=?, renewal_date=?,
-                    avg_daily_use=?, track_mode=?,
+                    avg_daily_use=?, avg_daily_value=?, avg_daily_value_unit=?,
+                    track_mode=?,
                     quick_deduct_1=?, quick_deduct_2=?,
                     notes=?
                 WHERE id=?
@@ -1766,6 +1886,8 @@ def edit_inventory(item_id):
                 float(current_stock), float(regular_stock),
                 unit, renewal_date or None,
                 float(avg_daily_use) if avg_daily_use else None,
+                float(avg_daily_value) if avg_daily_value else None,
+                (avg_daily_value_unit or None),
                 track_mode,
                 float(quick_deduct_1) if quick_deduct_1 else None,
                 float(quick_deduct_2) if quick_deduct_2 else None,
@@ -1961,12 +2083,84 @@ def complete_reminder(item_id):
     conn = get_db()
 
     reminder = conn.execute(
-        "SELECT title FROM reminders WHERE id = ?", (item_id,)
+        "SELECT * FROM reminders WHERE id = ?", (item_id,)
     ).fetchone()
+
+    def _compute_next_due(current_due, recurrence, interval_minutes, day_of_week, day_of_month):
+        # due_date is stored as YYYY-MM-DD
+        try:
+            current = datetime.strptime(current_due, "%Y-%m-%d").date()
+        except:
+            current = date.today()
+
+        today = date.today()
+
+        if recurrence == "daily":
+            return str(max(today, current) + timedelta(days=1))
+
+        if recurrence == "weekly":
+            # 0=Mon ... 6=Sun
+            target = day_of_week if day_of_week is not None else 0
+            base = max(today, current)
+            delta = (target - base.weekday()) % 7
+            if delta == 0:
+                delta = 7
+            return str(base + timedelta(days=delta))
+
+        if recurrence == "monthly":
+            target_day = day_of_month if day_of_month is not None else 1
+            base = max(today, current)
+            year = base.year
+            month = base.month + 1
+            if month == 13:
+                month = 1
+                year += 1
+            # clamp to last day of month
+            try:
+                first_next = date(year, month, 1)
+                last_day = (first_next + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+                d = min(target_day, last_day.day)
+                return str(date(year, month, d))
+            except:
+                return str(base + timedelta(days=30))
+
+        if recurrence == "minutes":
+            # We still store due_date as date; so minutes recurrence will "roll" by setting due_date=today
+            # and rely on external notification usage. Minimal support to keep it visible.
+            return str(today)
+
+        return None
 
     conn.execute(
         "UPDATE reminders SET done = 1 WHERE id = ?", (item_id,)
     )
+
+    # If recurring, create a fresh next reminder (keeps history)
+    if reminder and reminder["recurrence"]:
+        next_due = _compute_next_due(
+            reminder["due_date"],
+            reminder["recurrence"],
+            reminder["interval_minutes"],
+            reminder["day_of_week"],
+            reminder["day_of_month"],
+        )
+        if next_due:
+            conn.execute("""
+                INSERT INTO reminders
+                (title, due_date, priority, done, recurrence,
+                 interval_minutes, day_of_week, day_of_month, notes)
+                VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?)
+            """, (
+                reminder["title"],
+                next_due,
+                reminder["priority"],
+                reminder["recurrence"],
+                reminder["interval_minutes"],
+                reminder["day_of_week"],
+                reminder["day_of_month"],
+                reminder["notes"],
+            ))
+
     conn.commit()
     conn.close()
 
@@ -2130,7 +2324,7 @@ def analytics():
 @login_required
 def test_telegram():
     send_telegram(
-        "🏠 <b>AndyOS Test Message</b>\n\n"
+        "🏠 <b>Nku-OS Test Message</b>\n\n"
         "✅ Your Telegram bot is connected and working!\n"
         f"🕐 Sent at {datetime.now().strftime('%H:%M on %d %b %Y')}"
     )
