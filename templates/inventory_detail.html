@@ -11,8 +11,7 @@
     </div>
   </div>
   <div class="mobile-stack-row" style="display:flex; gap:0.5rem; align-items:center;">
-    <a href="/edit-inventory/{{ item.id }}" class="btn btn-primary">Edit</a>
-    <a href="/" class="btn btn-danger">← Back</a>
+    <a href="/" class="btn btn-primary">← Back</a>
   </div>
 </div>
 
@@ -69,7 +68,7 @@
       </div>
     </form>
 
-    <div class="mobile-stack" style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+    <div class="mobile-stack" style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:center;">
       {% if item.quick_deduct_1 %}
       <form action="/deduct/{{ item.id }}" method="POST">
         <input type="hidden" name="amount" value="{{ item.quick_deduct_1 }}">
@@ -103,6 +102,11 @@
                style="width:100px; margin:0;">
         <button type="submit" class="btn btn-success btn-sm">🛒 Refill</button>
       </form>
+
+      <a href="/edit-inventory/{{ item.id }}" class="btn btn-primary btn-sm">✎ Edit</a>
+      <a href="/delete/inventory/{{ item.id }}"
+         class="btn btn-danger btn-sm"
+         onclick="return confirm('Delete {{ item.name }}? This cannot be undone.');">✕ Delete</a>
     </div>
   </div>
 

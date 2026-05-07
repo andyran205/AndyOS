@@ -23,37 +23,77 @@
         <div class="page-subtitle">
             {{ today }} — Welcome to Nku-OS
         </div>
+        {% set warn_count =
+            (low_stock|length if low_stock else 0)
+            + (overdue_services|length if overdue_services else 0)
+            + (overdue|length if overdue else 0) %}
+        <div class="warnings-below-subtitle" style="margin-top:0.55rem;"
+             id="dashboard-alerts">
+            {% if warn_count > 0 %}
+            <details id="dashboard-warnings-details">
+                <summary>
+                    <span aria-hidden="true">⚠️</span>
+                    <span>{{ warn_count }} active warning{{ "" if warn_count == 1 else "s" }} — tap to view</span>
+                </summary>
+                <div class="warnings-panel-body">
+
+                    {% if overdue_services %}
+                    <div class="warnings-panel-section">
+                        <div class="warnings-panel-heading">Overdue services</div>
+                        <div class="warnings-panel-rows">
+                            {% for svc, st in overdue_services %}
+                            <a class="warnings-panel-row" href="/log-service/{{ svc.id }}">
+                                <span><b>{{ svc.name }}</b> — {{ st.days_overdue }} day{{ "" if st.days_overdue == 1 else "s" }} overdue</span>
+                                <span style="font-size:0.78rem;color:var(--text-brand);">Open →</span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if low_stock %}
+                    <div class="warnings-panel-section">
+                        <div class="warnings-panel-heading">Low stock</div>
+                        <div class="warnings-panel-rows">
+                            {% for i in low_stock %}
+                            <a class="warnings-panel-row" href="/inventory/{{ i.item.id }}">
+                                <span><b>{{ i.item.name }}</b> · {{ "%.0f"|format(i.pct) }}% left</span>
+                                <span style="font-size:0.78rem;color:var(--text-brand);">Open →</span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if overdue %}
+                    <div class="warnings-panel-section">
+                        <div class="warnings-panel-heading">Overdue reminders</div>
+                        <div class="warnings-panel-rows">
+                            {% for r in overdue %}
+                            <a class="warnings-panel-row" href="/edit-reminder/{{ r.id }}">
+                                <span><b>{{ r.title }}</b> — was due {{ r.due_date }}</span>
+                                <span style="font-size:0.78rem;color:var(--text-brand);">Review →</span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                </div>
+            </details>
+            {% else %}
+            <div class="warnings-below-subtitle ok">
+                <div role="note"
+                     style="cursor:default; display:inline-flex; align-items:center; gap:0.45rem;
+                            padding:0.55rem 0.85rem; border-radius:10px;">
+                    <span aria-hidden="true">✓</span>
+                    <span>No active warnings — you are all caught up.</span>
+                </div>
+            </div>
+            {% endif %}
+        </div>
     </div>
 </div>
-
-<!-- ALERTS -->
-{% if low_stock or overdue or overdue_services %}
-<div id="dashboard-alerts" style="margin-bottom:1.5rem;">
-    <div class="modern-alert-wrap">
-    {% if overdue_services %}
-    <div class="modern-alert modern-alert-danger">
-        <span>🔧 {{ overdue_services|length }} overdue service{{ "" if overdue_services|length == 1 else "s" }}</span>
-        <a href="/log-service/{{ overdue_services[0][0].id }}" style="color:inherit; font-weight:600;">Open first</a>
-    </div>
-    {% endif %}
-
-    {% if low_stock %}
-    <div class="modern-alert modern-alert-danger">
-        <span>⚠️ {{ low_stock|length }} low stock item{{ "" if low_stock|length == 1 else "s" }}</span>
-        <span>Most urgent: {{ low_stock[0].item.name }}</span>
-    </div>
-    {% endif %}
-
-    {% if overdue %}
-    <div class="modern-alert modern-alert-warning">
-        <span>🔔 {{ overdue|length }} overdue reminder{{ "" if overdue|length == 1 else "s" }}</span>
-        <span>Next: {{ overdue[0].title }}</span>
-    </div>
-    {% endif %}
-    </div>
-</div>
-{% endif %}
-
 
 <!-- STAT BOXES -->
 <div id="dashboard-stats" class="grid-4" style="margin-bottom:1.5rem;">
@@ -119,24 +159,23 @@
 
             {% if inventory %}
             {% for i in inventory %}
-            {% set inv_color = 'mini-row-white' %}
+            {% set row_tone = '' %}
             {% if i.days_left is not none and i.days_left <= 1 %}
-                {% set inv_color = 'mini-row-red' %}
+                {% set row_tone = 'dash-panel-row--tone-red' %}
             {% elif i.days_left is not none and i.days_left <= 5 %}
-                {% set inv_color = 'mini-row-yellow' %}
+                {% set row_tone = 'dash-panel-row--tone-yellow' %}
             {% elif i.pct >= 85 %}
-                {% set inv_color = 'mini-row-green' %}
+                {% set row_tone = 'dash-panel-row--tone-green' %}
             {% endif %}
 
-            <a href="/inventory/{{ i.item.id }}"
-                 class="inventory-item searchable-item mini-row clickable {{ inv_color }}"
+            <div class="inventory-item searchable-item dash-panel-row dash-panel-row--clickable {{ row_tone }}"
                  data-name="{{ i.item.name | lower }}"
                  data-category="{{ i.item.category | lower }}"
                  data-section="inventory"
-                 style="display:block; text-decoration:none; color:inherit;">
+                 onclick="if (!event.target.closest('a')) window.location.href='/inventory/{{ i.item.id }}';">
 
                 <div style="display:flex; justify-content:space-between;
-                            align-items:center; margin-bottom:0.2rem; gap:0.5rem;">
+                            align-items:flex-start; gap:0.5rem;">
                     <div>
                         <span style="font-weight:700; color:var(--text-main);">
                             {{ i.item.name }}
@@ -154,29 +193,29 @@
                         </span>
                         {% endif %}
                     </div>
-                    <div class="mobile-stack-row" style="display:flex; gap:0.4rem;">
+                </div>
+
+                <div class="dash-panel-row-meta">
+                    <div style="font-size:0.78rem; color:var(--text-muted);">
+                        {{ i.current }} / {{ i.item.regular_stock }} {{ i.item.unit }}
+                        {% if i.days_left is not none %}
+                        · {{ i.days_left }} day{{ "" if i.days_left == 1 else "s" }} left
+                        {% endif %}
+                    </div>
+                    <div class="dash-panel-actions">
                         <a href="/edit-inventory/{{ i.item.id }}"
-                           class="btn btn-primary btn-sm" onclick="event.stopPropagation();">✎</a>
+                           class="btn btn-primary btn-sm">✎</a>
                         <a href="/delete/inventory/{{ i.item.id }}"
                            class="btn btn-danger btn-sm"
-                           onclick="event.stopPropagation();
+                           onclick="
+                               event.stopPropagation();
                                return confirm(
                                'Delete {{ i.item.name }}?'
-                           )"
-                        >✕</a>
+                           )">✕</a>
                     </div>
                 </div>
 
-                <div style="font-size:0.78rem;
-                            color:var(--text-muted);
-                            margin-bottom:0.3rem;">
-                    {{ i.current }} / {{ i.item.regular_stock }} {{ i.item.unit }}
-                    {% if i.days_left is not none %}
-                    · {{ i.days_left }} day{{ "" if i.days_left == 1 else "s" }} left
-                    {% endif %}
-                </div>
-
-                <div class="progress-bar-bg" style="margin:0;">
+                <div class="progress-bar-bg" style="margin:0.35rem 0 0;">
                     <div class="progress-bar-fill
                         {% if i.pct > 70 %}bar-green
                         {% elif i.pct > 30 %}bar-yellow
@@ -184,7 +223,7 @@
                         style="width:{{ i.pct }}%;">
                     </div>
                 </div>
-            </a>
+            </div>
             {% endfor %}
 
             {% else %}
@@ -216,55 +255,54 @@
 
             {% if services %}
             {% for svc, status in services %}
-            {% set svc_color = 'mini-row-white' %}
+            {% set row_tone = '' %}
             {% if status.status == 'overdue' or (status.days_until is not none and status.days_until <= 1) %}
-                {% set svc_color = 'mini-row-red' %}
+                {% set row_tone = 'dash-panel-row--tone-red' %}
             {% elif status.days_until is not none and status.days_until <= 7 %}
-                {% set svc_color = 'mini-row-yellow' %}
+                {% set row_tone = 'dash-panel-row--tone-yellow' %}
             {% elif status.days_until is not none and status.days_until >= 20 %}
-                {% set svc_color = 'mini-row-green' %}
+                {% set row_tone = 'dash-panel-row--tone-green' %}
             {% endif %}
 
-            <div class="service-item searchable-item mini-row clickable {{ svc_color }}"
+            <div class="service-item searchable-item dash-panel-row dash-panel-row--clickable {{ row_tone }}"
                  data-name="{{ svc.name | lower }}"
                  data-category="{{ svc.category | lower }}"
                  data-section="services"
-                 onclick="window.location.href='/log-service/{{ svc.id }}'">
+                 onclick="if (!event.target.closest('a')) window.location.href='/log-service/{{ svc.id }}';">
 
-                <div style="display:flex; justify-content:space-between;
-                            align-items:center; margin-bottom:0.25rem; gap:0.5rem;">
-                    <div>
-                        <span style="font-weight:600;">{{ svc.name }}</span>
-                        <span style="color:var(--text-muted);
-                                     font-size:0.72rem;
-                                     margin-left:0.5rem;">{{ svc.category }}</span>
+                <div>
+                    <span style="font-weight:600;">{{ svc.name }}</span>
+                    <span style="color:var(--text-muted);
+                                 font-size:0.72rem;
+                                 margin-left:0.5rem;">{{ svc.category }}</span>
+                </div>
+
+                <div class="dash-panel-row-meta">
+                    <div style="font-size:0.77rem; color:var(--text-muted);">
+                        {% if status.status == "overdue" %}
+                            Overdue by {{ status.days_overdue }} day{{ "" if status.days_overdue == 1 else "s" }}
+                        {% elif status.days_until is not none %}
+                            Due in {{ status.days_until }} day{{ "" if status.days_until == 1 else "s" }} · {{ status.next_due }}
+                        {% else %}
+                            Set last service date to track
+                        {% endif %}
                     </div>
-                    <div class="mobile-stack-row" style="display:flex; gap:0.35rem;">
-                        <a href="/log-service/{{ svc.id }}"
-                           class="btn btn-success btn-sm" onclick="event.stopPropagation();">✓</a>
+                    <div class="dash-panel-actions">
                         <a href="/edit-inventory/{{ svc.id }}"
-                           class="btn btn-primary btn-sm" onclick="event.stopPropagation();">✎</a>
+                           class="btn btn-primary btn-sm">✎</a>
                         <a href="/delete/inventory/{{ svc.id }}"
                            class="btn btn-danger btn-sm"
-                           onclick="event.stopPropagation();
+                           onclick="
+                               event.stopPropagation();
                                return confirm(
                                'Delete {{ svc.name }}?'
-                           )">✕</a>
+                           );">✕</a>
                     </div>
                 </div>
 
-                <div style="font-size:0.77rem;
+                <div style="font-size:0.72rem;
                             color:var(--text-muted);
-                            margin-bottom:0.2rem;">
-                    {% if status.status == "overdue" %}
-                        Overdue by {{ status.days_overdue }} day{{ "" if status.days_overdue == 1 else "s" }}
-                    {% elif status.days_until is not none %}
-                        Due in {{ status.days_until }} day{{ "" if status.days_until == 1 else "s" }} · {{ status.next_due }}
-                    {% else %}
-                        Set last service date to track
-                    {% endif %}
-                </div>
-                <div style="font-size:0.72rem; color:var(--text-muted);">
+                            margin-top:0.35rem;">
                     Tap row to log this service
                 </div>
             </div>
@@ -340,7 +378,7 @@
                 </div>
                 <div class="mobile-stack-row" style="display:flex; gap:0.4rem;">
                     <a href="/complete-reminder/{{ r.id }}"
-                       class="btn btn-success btn-sm">✓</a>
+                       class="btn btn-success btn-sm">Done</a>
                     <a href="/edit-reminder/{{ r.id }}"
                        class="btn btn-primary btn-sm">✎</a>
                     <a href="/delete/reminders/{{ r.id }}"

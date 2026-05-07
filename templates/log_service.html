@@ -107,6 +107,17 @@
                     Notes: {{ item.notes }}
                 </div>
                 {% endif %}
+                <div class="mobile-stack-row"
+                     style="display:flex; gap:0.45rem;
+                            flex-wrap:wrap; margin-top:0.75rem;">
+                    <a href="/edit-inventory/{{ item.id }}"
+                       class="btn btn-primary btn-sm">✎ Edit</a>
+                    <a href="/delete/inventory/{{ item.id }}"
+                       class="btn btn-danger btn-sm"
+                       onclick="return confirm(
+                           'Delete {{ item.name }}? This cannot be undone.'
+                       );">✕ Delete</a>
+                </div>
             </div>
         </div>
 

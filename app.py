@@ -73,7 +73,6 @@ DEFAULT_INVENTORY_ITEMS = [
     {"name": "Drinking water", "category": "Utilities", "item_type": "quantifiable", "unit": "L", "current_stock": 0, "regular_stock": 0},
     {"name": "AC servicing", "category": "Maintenance", "item_type": "service", "frequency_days": 90},
     {"name": "Manhole Servic", "category": "Maintenance", "item_type": "service", "frequency_days": 180},
-    {"name": "Microwave", "category": "Maintenance", "item_type": "service", "frequency_days": 180},
 ]
 
 
@@ -651,6 +650,7 @@ def init_db():
 
     restore_inventory_from_backup_if_empty(conn)
     migrate_electricity_bill_to_quantifiable(conn)
+    migrate_microwave_service_to_expense(conn)
     ensure_default_inventory_items(conn)
     ensure_default_login_user(conn)
     backup_inventory(conn)
@@ -860,6 +860,69 @@ def ensure_default_inventory_items(conn):
             print(f"Inserted {inserted} default inventory item(s).")
     except Exception as e:
         print(f"Default inventory seed failed: {e}")
+
+
+def migrate_microwave_service_to_expense(conn):
+    """
+    Microwave is tracked as an expense category item, not a recurring service row.
+    """
+    try:
+        rows = conn.execute(
+            """
+            SELECT id FROM inventory
+            WHERE LOWER(TRIM(name)) = 'microwave'
+              AND item_type = 'service'
+            """
+        ).fetchall()
+        if not rows:
+            return
+
+        dup = conn.execute(
+            """
+            SELECT 1 FROM expenses
+            WHERE LOWER(TRIM(title)) = 'microwave'
+            LIMIT 1
+            """
+        ).fetchone()
+
+        deleted = 0
+        for row in rows:
+            inv_id = row["id"]
+            conn.execute(
+                "DELETE FROM service_log WHERE inventory_id = ?",
+                (inv_id,),
+            )
+            conn.execute(
+                "DELETE FROM usage_log WHERE inventory_id = ?",
+                (inv_id,),
+            )
+            conn.execute("DELETE FROM inventory WHERE id = ?", (inv_id,))
+            deleted += 1
+
+        if deleted and not dup:
+            conn.execute(
+                """
+                INSERT INTO expenses (title, amount, category, date, notes)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (
+                    "Microwave",
+                    0.0,
+                    "Maintenance",
+                    str(date.today()),
+                    (
+                        "Added automatically: was a recurring service item; "
+                        "record Microwave costs here as expenses.",
+                    ),
+                ),
+            )
+
+        if deleted:
+            conn.commit()
+            backup_inventory(conn)
+            print(f"Microwave service row(s) removed; expense shell added if needed.")
+    except Exception as e:
+        print(f"Microwave migration failed: {e}")
 
 
 def migrate_electricity_bill_to_quantifiable(conn):

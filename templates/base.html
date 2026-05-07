@@ -719,6 +719,156 @@
             color: #ff6b6b;
         }
 
+        .warnings-below-subtitle details > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .warnings-below-subtitle summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 0.55rem 0.85rem;
+            border-radius: 10px;
+            border: 1px solid rgba(252,196,25,0.35);
+            background: rgba(252,196,25,0.09);
+            color: #fcc419;
+            font-size: 0.86rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            max-width: 100%;
+        }
+
+        [data-theme="light"] .warnings-below-subtitle summary {
+            color: #b45309;
+        }
+
+        .warnings-below-subtitle summary:hover {
+            border-color: rgba(252,196,25,0.55);
+            background: rgba(252,196,25,0.14);
+        }
+
+        .warnings-below-subtitle.ok > div {
+            border: 1px solid rgba(81,207,102,0.35);
+            background: rgba(81,207,102,0.1);
+            color: #51cf66;
+            font-weight: 600;
+            font-size: 0.86rem;
+        }
+
+        .warnings-panel-body {
+            margin-top: 0.75rem;
+            padding: 0.85rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+
+        .warnings-panel-section {
+            margin-bottom: 1rem;
+        }
+
+        .warnings-panel-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .warnings-panel-heading {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .warnings-panel-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+        }
+
+        .warnings-panel-row {
+            padding: 0.55rem 0.65rem;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--bg-hover);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.6rem;
+            text-decoration: none;
+            color: inherit;
+            font-size: 0.84rem;
+        }
+
+        .warnings-panel-row:hover {
+            border-color: var(--text-brand);
+        }
+
+        .dash-panel-row {
+            display: block;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            padding: 0.95rem 1rem;
+            margin-bottom: 0.95rem;
+            background: var(--bg-card);
+            text-decoration: none;
+            color: inherit;
+            box-shadow: 0 2px 6px var(--shadow);
+            transition:
+                transform 0.15s ease,
+                border-color 0.2s ease,
+                box-shadow 0.2s ease;
+        }
+
+        .dash-panel-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .dash-panel-row:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px var(--shadow);
+        }
+
+        .dash-panel-row--clickable {
+            cursor: pointer;
+        }
+
+        .dash-panel-row--tone-red {
+            border-color: rgba(255,107,107,0.45);
+            background: rgba(255,107,107,0.08);
+        }
+
+        .dash-panel-row--tone-yellow {
+            border-color: rgba(252,196,25,0.42);
+            background: rgba(252,196,25,0.08);
+        }
+
+        .dash-panel-row--tone-green {
+            border-color: rgba(81,207,102,0.38);
+            background: rgba(81,207,102,0.08);
+        }
+
+        .dash-panel-row-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            margin-top: 0.55rem;
+        }
+
+        .dash-panel-actions {
+            display: flex;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-left: auto;
+        }
+
+        .dash-panel-actions a {
+            text-decoration: none;
+        }
+
         .modern-alert-warning {
             border-color: rgba(252,196,25,0.35);
             background: rgba(252,196,25,0.12);
