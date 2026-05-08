@@ -349,6 +349,23 @@
             <input type="text" name="title"
                    placeholder="e.g. Pay internet bill" required>
         </div>
+        
+        <div class="grid-2">
+            <div class="form-group">
+                <label>Due Date *</label>
+                <input type="date" name="due_date" required>
+            </div>
+            <div class="form-group">
+                <label>Reminder Time *</label>
+                <input type="time" name="reminder_time" 
+                       placeholder="e.g. 7:30 AM"
+                       required>
+                <div style="font-size:0.72rem; color:#9099b0; margin-top:0.25rem;">
+                    What time should you be reminded?
+                </div>
+            </div>
+        </div>
+
         <div class="grid-2">
             <div class="form-group">
                 <label>Repeat</label>
@@ -362,11 +379,13 @@
                     <option value="minutes">Every X minutes</option>
                 </select>
             </div>
+            
             <div class="form-group" id="repeat-minutes" style="display:none;">
                 <label>Interval (minutes)</label>
                 <input type="number" name="interval_minutes"
                        placeholder="e.g. 30" min="1" step="1">
             </div>
+            
             <div class="form-group" id="repeat-weekly" style="display:none;">
                 <label>Day of week</label>
                 <select name="day_of_week">
@@ -379,30 +398,28 @@
                     <option value="6">Sunday</option>
                 </select>
             </div>
+            
             <div class="form-group" id="repeat-monthly" style="display:none;">
                 <label>Day of month</label>
                 <input type="number" name="day_of_month"
                        placeholder="1-31" min="1" max="31" step="1">
             </div>
         </div>
-        <div class="grid-2">
-            <div class="form-group">
-                <label>Due Date *</label>
-                <input type="date" name="due_date" required>
-            </div>
-            <div class="form-group">
-                <label>Priority</label>
-                <select name="priority">
-                    <option value="low">Low</option>
-                    <option value="medium" selected>Medium</option>
-                    <option value="high">High</option>
-                </select>
-            </div>
+
+        <div class="form-group">
+            <label>Priority</label>
+            <select name="priority">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+            </select>
         </div>
+
         <div class="form-group">
             <label>Notes</label>
             <textarea name="notes" rows="3"></textarea>
         </div>
+        
         <button type="submit" class="btn btn-primary mobile-full">
             Save Reminder
         </button>
@@ -458,6 +475,8 @@ function toggleRecurrenceOptions() {
     const minutes = document.getElementById('repeat-minutes');
     const weekly  = document.getElementById('repeat-weekly');
     const monthly = document.getElementById('repeat-monthly');
+    
+    // Show/hide recurrence-specific fields
     if (minutes) minutes.style.display = (v === 'minutes') ? 'block' : 'none';
     if (weekly)  weekly.style.display  = (v === 'weekly') ? 'block' : 'none';
     if (monthly) monthly.style.display = (v === 'monthly') ? 'block' : 'none';
