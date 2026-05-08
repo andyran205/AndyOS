@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-title">Monthly spending</div>
+        <div class="page-subtitle">Amounts and what they were recorded for</div>
+    </div>
+    <div class="mobile-stack" style="display:flex; gap:0.45rem;">
+        <a href="{{ url_for('expenses_history', period='month') }}"
+           class="btn btn-primary">Expense list →</a>
+        <a href="{{ url_for('analytics') }}" class="btn btn-primary">Analytics →</a>
+        <a href="/" class="btn btn-primary">← Dashboard</a>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:1.25rem;">
+    <form method="get" action="{{ url_for('reports_monthly_spending') }}"
+          class="mobile-stack-row"
+          style="display:flex; flex-wrap:wrap; align-items:center; gap:0.75rem;">
+        <label style="margin:0; font-weight:600;">Month:</label>
+        <select name="month" onchange="this.form.submit()"
+                style="padding:0.45rem 0.75rem; border-radius:8px;
+                       border:1px solid var(--border);
+                       background:var(--bg-card); color:var(--text-main);
+                       font-size:0.9rem;">
+            {% if available_months %}
+                {% for m in available_months %}
+                <option value="{{ m }}" {% if m == month_key %}selected{% endif %}>
+                    {{ m }}</option>
+                {% endfor %}
+            {% else %}
+                <option value="{{ month_key }}">{{ month_key }}</option>
+            {% endif %}
+        </select>
+    </form>
+
+    {% if txn_count %}
+    <div class="grid-3" style="margin-top:1.25rem;">
+        <div class="stat-box">
+            <div class="stat-label">Transactions</div>
+            <div class="stat-value color-blue">{{ txn_count }}</div>
+            <div class="stat-sub">this month</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Total spent</div>
+            <div class="stat-value color-yellow">GHS {{ total_amt | money }}</div>
+            <div class="stat-sub">sum of amounts</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-label">Average</div>
+            <div class="stat-value color-green">
+                GHS {{ ((total_amt / txn_count) if txn_count else 0) | money }}
+            </div>
+            <div class="stat-sub">per transaction</div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div class="card-title" style="display:flex; flex-wrap:wrap;
+                align-items:center; justify-content:space-between; gap:0.5rem;">
+        <span>{{ month_key }} breakdown</span>
+        <span class="mobile-stack-row" style="display:flex; gap:0.45rem;">
+            <button type="button" class="btn btn-primary btn-sm"
+                    id="mon-share">Share</button>
+            <button type="button" class="btn btn-primary btn-sm"
+                    id="mon-csv-main">Download expenses CSV</button>
+            <button type="button" class="btn btn-primary btn-sm"
+                    id="mon-csv-cat">Download by category CSV</button>
+        </span>
+    </div>
+</div>
+
+<div class="grid-2" style="margin-bottom:1.5rem;">
+    <div class="card">
+        <div class="card-title">By category</div>
+        {% if by_category %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Category</th>
+                        <th>Total (GHS)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in by_category %}
+                    <tr>
+                        <td style="font-weight:600;">{{ c.category }}</td>
+                        <td style="color:#fcc419; font-weight:600;">
+                            {{ c.total | money }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">No spending this month.</div>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-title">Every expense (use / purpose)</div>
+        {% if expenses %}
+        <div class="table-wrap" style="max-height:420px; overflow:auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Title</th>
+                        <th>Category</th>
+                        <th>GHS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in expenses %}
+                    <tr>
+                        <td style="font-size:0.85rem;">{{ e.date }}</td>
+                        <td>{{ e.title }}</td>
+                        <td style="color:var(--text-muted);">{{ e.category }}</td>
+                        <td style="font-weight:600; color:#fcc419;">
+                            {{ e.amount | money }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">No rows for this month.</div>
+        {% endif %}
+    </div>
+</div>
+
+<script id="report-mon-exp"
+        type="application/json">{{ expenses_json | safe }}</script>
+<script id="report-mon-cat"
+        type="application/json">{{ category_json | safe }}</script>
+<script>
+(function(){
+    var monthKey = {{ month_key | tojson }};
+    var exp = [];
+    var cats = [];
+    try {
+        exp = JSON.parse(
+            document.getElementById("report-mon-exp").textContent || "[]"
+        );
+    } catch (_) {}
+    try {
+        cats = JSON.parse(
+            document.getElementById("report-mon-cat").textContent || "[]"
+        );
+    } catch (_) {}
+
+    document.getElementById("mon-csv-main").addEventListener("click", function(){
+        var hdr = ["id", "title", "category", "amount", "date", "notes"];
+        var rows = exp.map(function (r){
+            return hdr.map(function (k){ return r[k]; });
+        });
+        window.nkuDownloadCsv(
+            "nku-spending-" + monthKey + ".csv",
+            hdr,
+            rows
+        );
+    });
+
+    document.getElementById("mon-csv-cat").addEventListener("click", function(){
+        var hdr = ["month", "category", "total"];
+        var rows = cats.map(function (c){
+            return [monthKey, c.category, c.total];
+        });
+        window.nkuDownloadCsv(
+            "nku-spending-" + monthKey + "-categories.csv",
+            hdr,
+            rows
+        );
+    });
+
+    document.getElementById("mon-share").addEventListener(
+        "click",
+        async function(){
+            var title = "Nku-OS monthly spending (" + monthKey + ")";
+            var lines = [];
+            lines.push(title);
+            var total = cats.reduce(function (s,c){
+                return s + (parseFloat(c.total) || 0);
+            }, 0);
+            lines.push("Total GHS " + total.toFixed(4));
+            lines.push("");
+            lines.push("By category:");
+            cats.forEach(function (c){
+                lines.push("- " + c.category + ": " + String(c.total));
+            });
+            lines.push("");
+            lines.push("Line items:");
+            exp.forEach(function (e){
+                lines.push("- " + e.date + "  GHS " + String(e.amount)
+                    + "  " + String(e.category) + " — " + String(e.title));
+            });
+            await window.nkuSharePlain(title, lines.join("\n"));
+        }
+    );
+})();
+</script>
+{% endblock %}

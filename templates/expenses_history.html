@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-title">Expense history</div>
+        <div class="page-subtitle">{{ heading }}</div>
+        <div class="mobile-stack"
+             style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-top:0.85rem;">
+            <a href="{{ url_for('expenses_history', period='all') }}"
+               class="btn btn-primary btn-sm"
+               style="opacity: {% if period == 'all' %}1{% else %}0.65{% endif %};">
+                All time</a>
+            <a href="{{ url_for('expenses_history', period='month') }}"
+               class="btn btn-sm btn-primary"
+               style="{% if period != 'month' %}opacity:0.7{% endif %}">This month only</a>
+            <a href="{{ url_for('analytics') }}" class="btn btn-sm btn-primary"
+               style="opacity:0.85;">Analytics →</a>
+        </div>
+    </div>
+    <div class="mobile-stack" style="display:flex; gap:0.45rem;">
+        <a href="/add-expense" class="btn btn-primary">+ Add expense</a>
+        <a href="/" class="btn btn-primary">← Dashboard</a>
+    </div>
+</div>
+
+<div class="grid-3" style="margin-bottom:1.25rem;">
+    <div class="stat-box">
+        <div class="stat-label">Transactions</div>
+        <div class="stat-value color-blue">{{ txn_count }}</div>
+        <div class="stat-sub">shown below</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Total (GHS)</div>
+        <div class="stat-value color-yellow">{{ total_amt | money }}</div>
+        <div class="stat-sub">for this view</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">Average (GHS)</div>
+        <div class="stat-value color-green">{{ avg_amt | money }}</div>
+        <div class="stat-sub">per transaction</div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div class="card-title" style="display:flex; flex-wrap:wrap;
+                align-items:center; justify-content:space-between; gap:0.5rem;">
+        <span>Actions</span>
+        <span class="mobile-stack-row" style="display:flex; gap:0.45rem;">
+            <button type="button" class="btn btn-primary btn-sm"
+                    id="hist-share">Share summary</button>
+            <button type="button" class="btn btn-primary btn-sm"
+                    id="hist-csv">Download CSV</button>
+        </span>
+    </div>
+    <div style="font-size:0.82rem; color:var(--text-muted);">
+        Share opens the device sheet when supported; otherwise the summary is copied.
+    </div>
+</div>
+
+<div class="card">
+    {% if expenses %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Amount</th>
+                    <th>Date</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in expenses %}
+                <tr>
+                    <td>{{ e.title }}</td>
+                    <td style="color:var(--text-muted);">{{ e.category }}</td>
+                    <td style="font-weight:600; color:#fcc419;">
+                        {{ e.amount | money }}</td>
+                    <td style="font-size:0.85rem; color:var(--text-muted);">
+                        {{ e.date }}</td>
+                    <td style="white-space:nowrap;">
+                        <a href="/edit-expense/{{ e.id }}"
+                           class="btn btn-primary btn-sm">✎</a>
+                        <a href="/delete/expenses/{{ e.id }}"
+                           class="btn btn-danger btn-sm"
+                           onclick="return confirm(
+                               'Delete this expense?'
+                           );">✕</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">No expenses in this period yet.</div>
+    {% endif %}
+</div>
+
+<script id="expenses-history-json"
+        type="application/json">{{ expenses_json | safe }}</script>
+<script>
+(function(){
+    let rows = [];
+    try {
+        const el = document.getElementById("expenses-history-json");
+        rows = JSON.parse(el.textContent || "[]");
+    } catch (_) {}
+    const title =
+        "{{ period }}" === "month"
+            ? "Nku-OS — This month's expenses"
+            : "Nku-OS — All expenses";
+
+    function buildCsv() {
+        const headers = ["id", "title", "category", "amount", "date", "notes"];
+        const csvRows = rows.map(function (r) {
+            return headers.map(function (k) {
+                return r[k] == null ? "" : r[k];
+            });
+        });
+        return { headers: headers, csvRows: csvRows };
+    }
+
+    document.getElementById("hist-csv").addEventListener("click", function(){
+        var d = buildCsv();
+        window.nkuDownloadCsv(
+            "nku-expenses-{{ period }}.csv",
+            d.headers,
+            d.csvRows
+        );
+    });
+
+    document.getElementById("hist-share").addEventListener(
+        "click",
+        async function(){
+            let total = rows.reduce(function (s, r) {
+                return s + (parseFloat(r.amount) || 0);
+            }, 0);
+            let lines = [title];
+            lines.push("Total GHS " + total.toFixed(4));
+            lines.push("");
+            rows.slice(0, 60).forEach(function (r){
+                lines.push([
+                    r.date,
+                    String(r.amount),
+                    String(r.category || ""),
+                    String(r.title || "")
+                ].join(" · "));
+            });
+            if (rows.length > 60) lines.push("(… +" + (rows.length - 60) + " more)");
+            await window.nkuSharePlain(title, lines.join("\n"));
+        }
+    );
+})();
+</script>
+{% endblock %}

@@ -152,11 +152,44 @@ def inject_template_globals():
     }
 
 
+@app.template_filter("money")
+def format_money_4dp(value):
+    try:
+        return f"{float(value):.4f}"
+    except (TypeError, ValueError):
+        return "0.0000"
+
+
 def get_user_by_username(conn, username):
     return conn.execute(
         "SELECT * FROM users WHERE LOWER(username) = LOWER(?)",
         (username,)
     ).fetchone()
+
+
+DUPLICATE_AMOUNT_TOLERANCE = 1e-8
+
+
+def find_duplicate_expense(conn, title, amount, exp_date, exclude_id=None):
+    """Same normalized title + date + amount (within tolerance) as existing row."""
+    if not title or not exp_date:
+        return None
+    try:
+        amt = float(amount)
+    except (TypeError, ValueError):
+        return None
+    sql = """
+        SELECT id, title, amount, date FROM expenses
+        WHERE LOWER(TRIM(title)) = LOWER(TRIM(?))
+          AND date = ?
+          AND ABS(CAST(amount AS REAL) - ?) < ?
+    """
+    params = [title, exp_date, amt, DUPLICATE_AMOUNT_TOLERANCE]
+    if exclude_id is not None:
+        sql += " AND id != ?"
+        params.append(exclude_id)
+    sql += " LIMIT 1"
+    return conn.execute(sql, tuple(params)).fetchone()
 
 
 # ============================================================
@@ -1883,7 +1916,7 @@ def home():
         services.append((svc, status))
 
     expenses = cursor.execute(
-        "SELECT * FROM expenses ORDER BY date DESC LIMIT 5"
+        "SELECT * FROM expenses ORDER BY date DESC LIMIT 25"
     ).fetchall()
 
     reminders = cursor.execute(
@@ -1927,7 +1960,8 @@ def home():
         low_stock=low_stock,
         overdue_services=overdue_services,
         overdue=overdue,
-        today=today_str
+        today=today_str,
+        calendar_month=f"{today.year}-{today.month:02d}",
     )
 
 
@@ -2219,27 +2253,50 @@ def log_service(item_id):
         ))
 
         if cost:
-            conn.execute("""
-                INSERT INTO expenses
-                (title, amount, category, date, notes)
-                VALUES (?, ?, ?, ?, ?)
-            """, (
-                f"{item['name']} service",
-                float(cost),
-                item["category"],
-                service_date,
-                notes or None
-            ))
+            try:
+                cost_val = float(cost)
+            except (TypeError, ValueError):
+                cost_val = None
+            if cost_val is not None and cost_val > 0:
+                exp_title = f"{item['name']} service"
+                dup = find_duplicate_expense(
+                    conn, exp_title, cost_val, service_date
+                )
+                if dup is None:
+                    conn.execute("""
+                        INSERT INTO expenses
+                        (title, amount, category, date, notes)
+                        VALUES (?, ?, ?, ?, ?)
+                    """, (
+                        exp_title,
+                        cost_val,
+                        item["category"],
+                        service_date,
+                        notes or None,
+                    ))
+                else:
+                    flash(
+                        "Skipped duplicate expense for this service "
+                        f"(matches expense #{dup['id']}).",
+                        "warning",
+                    )
 
         conn.commit()
         backup_inventory(conn)
         conn.close()
 
+        cost_display = ""
+        if cost:
+            try:
+                cost_display = f"\nCost: GHS {float(cost):.4f}"
+            except (TypeError, ValueError):
+                pass
+
         send_telegram(
             f"🔧 <b>Service Logged</b>\n\n"
             f"⚙️ <b>{item['name']}</b>\n"
             f"Date: {service_date}"
-            + (f"\nCost: GHS {float(cost):.2f}" if cost else "")
+            + cost_display
         )
 
         return redirect(url_for("home"))
@@ -2275,25 +2332,64 @@ def add_expense():
             return render_template(
                 "add.html",
                 error="Title, category, and date are required.",
-                section="expense"
+                section="expense",
+            )
+
+        try:
+            amt_val = float(amount)
+        except (TypeError, ValueError):
+            return render_template(
+                "add.html",
+                error="Amount must be a valid number.",
+                section="expense",
+                expense_prefill={
+                    "title": title,
+                    "amount": amount,
+                    "category": category,
+                    "date": exp_date,
+                    "notes": notes,
+                },
             )
 
         conn = get_db()
-        conn.execute("""
+        dup = find_duplicate_expense(conn, title, amt_val, exp_date)
+        confirm = request.form.get("confirm_duplicate") == "1"
+
+        if dup is not None and not confirm:
+            conn.close()
+            return render_template(
+                "add.html",
+                section="expense",
+                expense_prefill={
+                    "title": title,
+                    "amount": amount,
+                    "category": category,
+                    "date": exp_date,
+                    "notes": notes,
+                },
+                expense_duplicate_of=dup["id"],
+                expense_duplicate_hint=(
+                    "An expense with this title, date, and amount "
+                    f"already exists (#{dup['id']}). Check the box below "
+                    "only if this is a genuinely separate purchase."
+                ),
+            )
+
+        conn.execute(
+            """
             INSERT INTO expenses
             (title, amount, category, date, notes)
             VALUES (?, ?, ?, ?, ?)
-        """, (
-            title, float(amount), category,
-            exp_date, notes or None
-        ))
+            """,
+            (title, amt_val, category, exp_date, notes or None),
+        )
         conn.commit()
         conn.close()
 
         send_telegram(
             f"💰 <b>New Expense Recorded</b>\n\n"
             f"📝 <b>{title}</b>\n"
-            f"Amount: <b>GHS {float(amount):.2f}</b>\n"
+            f"Amount: <b>GHS {amt_val:.4f}</b>\n"
             f"Category: {category}\n"
             f"Date: {exp_date}"
         )
@@ -2475,17 +2571,29 @@ def edit_inventory(item_id):
             try:
                 expense_amount = float(expense_amount_raw)
                 if expense_amount > 0:
-                    conn.execute("""
-                        INSERT INTO expenses
-                        (title, amount, category, date, notes)
-                        VALUES (?, ?, ?, ?, ?)
-                    """, (
-                        f"{name} expense",
-                        expense_amount,
-                        category,
-                        str(date.today()),
-                        "Auto-added from inventory edit",
-                    ))
+                    exp_title = f"{name} expense"
+                    exp_day = str(date.today())
+                    dup = find_duplicate_expense(
+                        conn, exp_title, expense_amount, exp_day
+                    )
+                    if dup is None:
+                        conn.execute("""
+                            INSERT INTO expenses
+                            (title, amount, category, date, notes)
+                            VALUES (?, ?, ?, ?, ?)
+                        """, (
+                            exp_title,
+                            expense_amount,
+                            category,
+                            exp_day,
+                            "Auto-added from inventory edit",
+                        ))
+                    else:
+                        flash(
+                            "Skipped duplicate auto-expense "
+                            f"(matches expense #{dup['id']}).",
+                            "warning",
+                        )
             except ValueError:
                 pass
 
@@ -2510,6 +2618,13 @@ def edit_inventory(item_id):
 @login_required
 def edit_expense(item_id):
     conn = get_db()
+    item = conn.execute(
+        "SELECT * FROM expenses WHERE id = ?", (item_id,)
+    ).fetchone()
+
+    if not item:
+        conn.close()
+        return redirect(url_for("home"))
 
     if request.method == "POST":
         title    = request.form.get("title", "").strip()
@@ -2518,12 +2633,42 @@ def edit_expense(item_id):
         exp_date = request.form.get("date", "").strip()
         notes    = request.form.get("notes", "").strip()
 
+        try:
+            amt_val = float(amount)
+        except (TypeError, ValueError):
+            conn.close()
+            return render_template(
+                "edit.html",
+                item=item,
+                section="expense",
+                error="Amount must be a valid number.",
+            )
+
+        dup = find_duplicate_expense(
+            conn, title, amt_val, exp_date, exclude_id=item_id
+        )
+        confirm = request.form.get("confirm_duplicate") == "1"
+
+        if dup is not None and not confirm:
+            conn.close()
+            return render_template(
+                "edit.html",
+                item=item,
+                section="expense",
+                expense_duplicate_of=dup["id"],
+                expense_duplicate_hint=(
+                    "Another expense with this title, date, and amount "
+                    f"already exists (#{dup['id']}). "
+                    "Check the box below only if this change is intentional."
+                ),
+            )
+
         conn.execute("""
             UPDATE expenses
             SET title=?, amount=?, category=?, date=?, notes=?
             WHERE id=?
         """, (
-            title, float(amount), category,
+            title, amt_val, category,
             exp_date, notes or None, item_id
         ))
         conn.commit()
@@ -2532,18 +2677,12 @@ def edit_expense(item_id):
         send_telegram(
             f"✏️ <b>Expense Updated</b>\n\n"
             f"📝 <b>{title}</b>\n"
-            f"Amount: <b>GHS {float(amount):.2f}</b>"
+            f"Amount: <b>GHS {amt_val:.4f}</b>"
         )
 
         return redirect(url_for("home"))
 
-    item = conn.execute(
-        "SELECT * FROM expenses WHERE id = ?", (item_id,)
-    ).fetchone()
     conn.close()
-
-    if not item:
-        return redirect(url_for("home"))
 
     return render_template(
         "edit.html", item=item, section="expense"
@@ -2824,6 +2963,199 @@ def set_daily_average(item_id):
 
 
 # ============================================================
+# ROUTES — EXPENSES HISTORY & REPORTS
+# ============================================================
+
+@app.route("/expenses")
+@login_required
+def expenses_history():
+    period = request.args.get("period", "all")
+    today = date.today()
+    month_start = f"{today.year}-{today.month:02d}-01"
+
+    conn = get_db()
+    try:
+        if period == "month":
+            rows = conn.execute(
+                """
+                SELECT * FROM expenses
+                WHERE date >= ?
+                ORDER BY date DESC, id DESC
+                """,
+                (month_start,),
+            ).fetchall()
+            heading = "This month's expenses"
+        else:
+            rows = conn.execute(
+                """
+                SELECT * FROM expenses
+                ORDER BY date DESC, id DESC
+                """
+            ).fetchall()
+            heading = "All expenses (full history)"
+
+        total_amt = sum(float(r["amount"] or 0) for r in rows)
+        txn_count = len(rows)
+        avg_amt = (total_amt / txn_count) if txn_count else 0.0
+    finally:
+        conn.close()
+
+    rows_plain = [dict(r) for r in rows]
+
+    return render_template(
+        "expenses_history.html",
+        expenses=rows,
+        expenses_json=json.dumps(rows_plain, default=str),
+        period=period,
+        heading=heading,
+        month_start=month_start,
+        total_amt=total_amt,
+        txn_count=txn_count,
+        avg_amt=avg_amt,
+    )
+
+
+@app.route("/reports/inventory")
+@login_required
+def reports_inventory():
+    conn = get_db()
+    try:
+        rows = conn.execute(
+            """
+            SELECT * FROM inventory
+            WHERE item_type = 'quantifiable'
+            ORDER BY name
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    data = [dict(r) for r in rows]
+    return render_template(
+        "reports_inventory.html",
+        items=data,
+        items_json=json.dumps(data, default=str),
+    )
+
+
+@app.route("/reports/services")
+@login_required
+def reports_services():
+    conn = get_db()
+    try:
+        svc_rows = conn.execute(
+            """
+            SELECT * FROM inventory
+            WHERE item_type = 'service'
+            ORDER BY name
+            """
+        ).fetchall()
+        enriched = []
+        for svc in svc_rows:
+            st = get_service_status(
+                svc["last_service_date"], svc["frequency_days"]
+            )
+            row_d = dict(svc)
+            enriched.append({"item": row_d, "status": st})
+    finally:
+        conn.close()
+
+    return render_template(
+        "reports_services.html",
+        services=enriched,
+        services_json=json.dumps(enriched, default=str),
+    )
+
+
+@app.route("/reports/reminders")
+@login_required
+def reports_reminders():
+    conn = get_db()
+    today_str = str(date.today())
+    try:
+        pending = conn.execute(
+            """
+            SELECT * FROM reminders
+            WHERE done = 0
+            ORDER BY due_date ASC, id ASC
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    data_plain = [dict(r) for r in pending]
+    return render_template(
+        "reports_reminders.html",
+        reminders=pending,
+        reminders_json=json.dumps(data_plain, default=str),
+        today_str=today_str,
+    )
+
+
+@app.route("/reports/monthly-spending")
+@login_required
+def reports_monthly_spending():
+    today = date.today()
+    default_month = f"{today.year}-{today.month:02d}"
+    month_key = request.args.get("month", default_month).strip()
+
+    if len(month_key) != 7 or month_key[4] != "-":
+        month_key = default_month
+
+    conn = get_db()
+    try:
+        month_rows = conn.execute(
+            """
+            SELECT DISTINCT strftime('%Y-%m', date) AS m
+            FROM expenses
+            WHERE date IS NOT NULL AND TRIM(date) != ''
+            ORDER BY m DESC
+            """
+        ).fetchall()
+        available_months = [r["m"] for r in month_rows if r["m"]]
+
+        rows = conn.execute(
+            """
+            SELECT * FROM expenses
+            WHERE strftime('%Y-%m', date) = ?
+            ORDER BY date DESC, id DESC
+            """,
+            (month_key,),
+        ).fetchall()
+
+        cat_rows = conn.execute(
+            """
+            SELECT category, SUM(amount) AS total
+            FROM expenses
+            WHERE strftime('%Y-%m', date) = ?
+            GROUP BY category
+            ORDER BY total DESC
+            """,
+            (month_key,),
+        ).fetchall()
+
+        total_amt = sum(float(r["amount"] or 0) for r in rows)
+        txn_count = len(rows)
+    finally:
+        conn.close()
+
+    rows_plain = [dict(r) for r in rows]
+    cat_plain = [dict(r) for r in cat_rows]
+
+    return render_template(
+        "reports_monthly_spending.html",
+        month_key=month_key,
+        available_months=available_months,
+        expenses=rows,
+        expenses_json=json.dumps(rows_plain, default=str),
+        by_category=cat_rows,
+        category_json=json.dumps(cat_plain, default=str),
+        total_amt=total_amt,
+        txn_count=txn_count,
+    )
+
+
+# ============================================================
 # ROUTES — ANALYTICS
 # ============================================================
 
@@ -2841,6 +3173,7 @@ def analytics():
 
     today       = date.today()
     month_start = f"{today.year}-{today.month:02d}-01"
+    calendar_month = month_start[:7]
 
     daily_spend = conn.execute("""
         SELECT date, SUM(amount) as total
@@ -2865,6 +3198,10 @@ def analytics():
         "SELECT * FROM inventory WHERE item_type = 'quantifiable'"
         " ORDER BY name"
     ).fetchall()
+
+    services_tracked_count = conn.execute(
+        "SELECT COUNT(*) FROM inventory WHERE item_type = 'service'"
+    ).fetchone()[0] or 0
 
     total_reminders = conn.execute(
         "SELECT COUNT(*) FROM reminders"
@@ -2942,6 +3279,8 @@ def analytics():
         pending_reminders  = pending_reminders,
         overdue_reminders  = overdue_reminders,
         inventory_count    = len(inventory_raw),
+        calendar_month     = calendar_month,
+        services_tracked_count = services_tracked_count,
     )
 
 

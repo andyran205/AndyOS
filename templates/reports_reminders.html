@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-title">Pending reminders</div>
+        <div class="page-subtitle">
+            Today's date: {{ today_str }}
+        </div>
+    </div>
+    <div class="mobile-stack" style="display:flex; gap:0.45rem;">
+        <a href="/add-reminder" class="btn btn-primary">+ Add</a>
+        <a href="/" class="btn btn-primary">← Dashboard</a>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div class="card-title" style="display:flex; flex-wrap:wrap;
+                align-items:center; justify-content:space-between; gap:0.5rem;">
+        <span>Reminder list</span>
+        <span class="mobile-stack-row" style="display:flex; gap:0.45rem;">
+            <button type="button" class="btn btn-primary btn-sm"
+                    id="rem-share">Share</button>
+            <button type="button" class="btn btn-primary btn-sm"
+                    id="rem-csv">Download CSV</button>
+        </span>
+    </div>
+</div>
+
+<div class="card">
+    {% if reminders %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Due</th>
+                    <th>Priority</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in reminders %}
+                <tr {% if r.due_date < today_str %}style="outline:1px solid #ff6b6b;border-radius:6px;"
+                    {% endif %}>
+                    <td style="font-weight:600;">{{ r.title }}</td>
+                    <td style="font-size:0.9rem;">{{ r.due_date }}</td>
+                    <td><span class="badge badge-{{ r.priority }}"
+                              style="text-transform:capitalize;">
+                        {{ r.priority }}</span></td>
+                    <td style="white-space:nowrap;">
+                        <a href="/complete-reminder/{{ r.id }}"
+                           class="btn btn-success btn-sm">Done</a>
+                        <a href="/edit-reminder/{{ r.id }}"
+                           class="btn btn-primary btn-sm">✎</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        Nothing pending — you are caught up.<br>
+        <a href="/add-reminder">Add a reminder</a>
+    </div>
+    {% endif %}
+</div>
+
+<script id="report-rem-json"
+        type="application/json">{{ reminders_json | safe }}</script>
+<script>
+(function(){
+    let rows = [];
+    try {
+        const el = document.getElementById("report-rem-json");
+        rows = JSON.parse(el.textContent || "[]");
+    } catch (_) {}
+
+    document.getElementById("rem-csv").addEventListener("click", function(){
+        var hdr = ["id", "title", "due_date", "priority",
+                   "notes", "recurrence"];
+        var csv = rows.map(function (r){
+            return [r.id, r.title, r.due_date, r.priority,
+                    r.notes || "", r.recurrence || ""];
+        });
+        window.nkuDownloadCsv("nku-pending-reminders.csv", hdr, csv);
+    });
+
+    document.getElementById("rem-share").addEventListener(
+        "click",
+        async function(){
+            var lines = ["Nku-OS — Pending reminders", ""];
+            rows.forEach(function (r){
+                lines.push(
+                    "- " + r.title + "\n   due "
+                    + r.due_date + ", " + String(r.priority) + " priority"
+                );
+            });
+            await window.nkuSharePlain("Reminders", lines.join("\n"));
+        });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-title">Service items</div>
+        <div class="page-subtitle">Recurring services and maintenance schedules</div>
+    </div>
+    <div class="mobile-stack" style="display:flex; gap:0.45rem;">
+        <a href="/add" class="btn btn-primary">+ Add service</a>
+        <a href="/" class="btn btn-primary">← Dashboard</a>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:1rem;">
+    <div class="card-title" style="display:flex; flex-wrap:wrap;
+                align-items:center; justify-content:space-between; gap:0.5rem;">
+        <span>Services report</span>
+        <span class="mobile-stack-row" style="display:flex; gap:0.45rem;">
+            <button type="button" class="btn btn-primary btn-sm"
+                    id="svc-share">Share</button>
+            <button type="button" class="btn btn-primary btn-sm"
+                    id="svc-csv">Download CSV</button>
+        </span>
+    </div>
+</div>
+
+<div class="card">
+    {% if services %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Frequency</th>
+                    <th>Last service</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in services %}
+                {% set svc = row.item %}
+                {% set st = row.status %}
+                <tr>
+                    <td style="font-weight:600;">{{ svc.name }}</td>
+                    <td style="color:var(--text-muted);">{{ svc.category }}</td>
+                    <td>every {{ svc.frequency_days }} d</td>
+                    <td style="font-size:0.85rem;">
+                        {{ svc.last_service_date or "—" }}</td>
+                    <td style="font-size:0.85rem;">
+                        {% if st.status == 'overdue' %}
+                        <span style="color:#ff6b6b;">{{ st.days_overdue }} days overdue</span>
+                        {% elif st.status == 'due-soon' %}
+                        <span style="color:#fcc419;">due soon</span>
+                        {% else %}
+                        <span style="color:#51cf66;">OK</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="/log-service/{{ svc.id }}" class="btn btn-primary btn-sm">
+                            Log</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">No service items yet.</div>
+    {% endif %}
+</div>
+
+<script id="report-svc-json"
+        type="application/json">{{ services_json | safe }}</script>
+<script>
+(function(){
+    let rows = [];
+    try {
+        const el = document.getElementById("report-svc-json");
+        rows = JSON.parse(el.textContent || "[]");
+    } catch (_) {}
+
+    document.getElementById("svc-csv").addEventListener("click", function(){
+        var hdr = [
+            "inventory_id",
+            "name",
+            "category",
+            "frequency_days",
+            "last_service_date",
+            "avg_cost",
+            "status_summary"
+        ];
+        var csvRows = rows.map(function (row){
+            var svc = row.item || {};
+            var st = row.status || {};
+            var sum = "";
+            if (st.status === "overdue") sum = st.days_overdue + " days overdue";
+            else if (st.status === "due-soon") sum = "due soon";
+            else sum = "ok";
+            return [
+                svc.id,
+                svc.name,
+                svc.category,
+                svc.frequency_days,
+                svc.last_service_date || "",
+                svc.avg_cost ?? "",
+                sum
+            ];
+        });
+        window.nkuDownloadCsv("nku-services.csv", hdr, csvRows);
+    });
+
+    document.getElementById("svc-share").addEventListener(
+        "click",
+        async function(){
+            var lines = ["Nku-OS — Service items", ""];
+            rows.forEach(function (row){
+                var svc = row.item || {};
+                var st = row.status || {};
+                var tag = "";
+                if (st.status === "overdue") tag = "(" + st.days_overdue + "d overdue)";
+                else if (st.status === "due-soon") tag = "(due soon)";
+                lines.push("- " + svc.name + " " + tag
+                    + "\n  last: "
+                    + (svc.last_service_date || "—")
+                    + ", every "
+                    + svc.frequency_days + " days");
+            });
+            await window.nkuSharePlain("Services", lines.join("\n"));
+        });
+})();
+</script>
+{% endblock %}

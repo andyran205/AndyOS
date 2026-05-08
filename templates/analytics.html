@@ -9,36 +9,44 @@
             Overview of your spending, stock and reminders
         </div>
     </div>
-    <a href="/" class="btn btn-primary">← Dashboard</a>
+    <div class="mobile-stack"
+         style="display:flex; flex-wrap:wrap; gap:0.45rem; justify-content:flex-end;">
+        <a href="{{ url_for('reports_services') }}"
+           class="btn btn-primary btn-sm">Service items →</a>
+        <a href="/" class="btn btn-primary">← Dashboard</a>
+    </div>
 </div>
 
 <div class="grid-4" style="margin-bottom:1.5rem;">
-    <div class="stat-box">
+    <a href="{{ url_for('expenses_history') }}" class="stat-box stat-box--clickable">
         <div class="stat-label">All Time Spending</div>
         <div class="stat-value color-yellow">
-            GHS {{ "%.2f" | format(all_time_total) }}
+            GHS {{ all_time_total | money }}
         </div>
-        <div class="stat-sub">{{ total_transactions }} transactions</div>
-    </div>
-    <div class="stat-box">
+        <div class="stat-sub">{{ total_transactions }} transactions — full list</div>
+    </a>
+    <a href="{{ url_for('reports_monthly_spending', month=calendar_month) }}"
+       class="stat-box stat-box--clickable">
         <div class="stat-label">This Month</div>
         <div class="stat-value color-blue">
-            GHS {{ "%.2f" | format(monthly_this_month) }}
+            GHS {{ monthly_this_month | money }}
         </div>
-        <div class="stat-sub">current month total</div>
-    </div>
-    <div class="stat-box">
+        <div class="stat-sub">monthly breakdown</div>
+    </a>
+    <a href="{{ url_for('expenses_history') }}" class="stat-box stat-box--clickable">
         <div class="stat-label">Avg Per Transaction</div>
         <div class="stat-value color-green">
-            GHS {{ "%.2f" | format(avg_transaction) }}
+            GHS {{ avg_transaction | money }}
         </div>
         <div class="stat-sub">average spend</div>
-    </div>
-    <div class="stat-box">
+    </a>
+    <a href="{{ url_for('reports_inventory') }}" class="stat-box stat-box--clickable">
         <div class="stat-label">Items Tracked</div>
         <div class="stat-value color-blue">{{ inventory_count }}</div>
-        <div class="stat-sub">inventory items</div>
-    </div>
+        <div class="stat-sub">
+            {{ inventory_count }} inventory · {{ services_tracked_count }} services
+        </div>
+    </a>
 </div>
 
 <div class="grid-2" style="margin-bottom:1.5rem;">
@@ -80,7 +88,11 @@
     </div>
 
     <div class="card">
-        <div class="card-title">🔔 Reminder Overview</div>
+        <div class="card-title">
+            🔔 Reminder Overview
+            <a href="{{ url_for('reports_reminders') }}"
+               style="margin-left:0.5rem; font-size:0.82rem;">Pending list →</a>
+        </div>
         {% if total_reminders > 0 %}
         <div style="max-width:220px; margin:0 auto 1.5rem;">
             <canvas id="reminderChart"></canvas>
@@ -137,7 +149,7 @@
         <tr>
             <td style="font-weight:500;">{{ cat_labels[i] }}</td>
             <td style="color:#fcc419; font-weight:600;">
-                GHS {{ "%.2f" | format(cat_values[i]) }}
+                GHS {{ cat_values[i] | money }}
             </td>
             <td style="color:#9099b0;">{{ pct }}%</td>
             <td style="width:200px;">
@@ -190,7 +202,7 @@ new Chart(document.getElementById('categoryChart'), {
             tooltip: {
                 callbacks: {
                     label: function(ctx) {
-                        return ' GHS ' + ctx.parsed.toFixed(2);
+                        return ' GHS ' + Number(ctx.parsed).toFixed(4);
                     }
                 }
             }
@@ -220,7 +232,7 @@ new Chart(document.getElementById('monthlyChart'), {
             tooltip: {
                 callbacks: {
                     label: function(ctx) {
-                        return ' GHS ' + ctx.parsed.y.toFixed(2);
+                        return ' GHS ' + Number(ctx.parsed.y).toFixed(4);
                     }
                 }
             }
@@ -261,7 +273,7 @@ new Chart(document.getElementById('dailyChart'), {
             tooltip: {
                 callbacks: {
                     label: function(ctx) {
-                        return ' GHS ' + ctx.parsed.y.toFixed(2);
+                        return ' GHS ' + Number(ctx.parsed.y).toFixed(4);
                     }
                 }
             }

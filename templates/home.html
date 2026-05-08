@@ -97,34 +97,38 @@
 
 <!-- STAT BOXES -->
 <div id="dashboard-stats" class="grid-4" style="margin-bottom:1.5rem;">
-    <div class="stat-box">
+    <a href="{{ url_for('reports_inventory') }}"
+       class="stat-box stat-box--clickable">
         <div class="stat-label">Inventory Items</div>
         <div class="stat-value color-blue">
             {{ inventory | length }}
         </div>
-        <div class="stat-sub">quantifiable</div>
-    </div>
-    <div class="stat-box">
+        <div class="stat-sub">quantifiable — open list</div>
+    </a>
+    <a href="{{ url_for('reports_services') }}"
+       class="stat-box stat-box--clickable">
         <div class="stat-label">Service Items</div>
         <div class="stat-value color-blue">
             {{ services | length }}
         </div>
-        <div class="stat-sub">tracked services</div>
-    </div>
-    <div class="stat-box">
+        <div class="stat-sub">tracked services — open list</div>
+    </a>
+    <a href="{{ url_for('reports_monthly_spending', month=calendar_month) }}"
+       class="stat-box stat-box--clickable">
         <div class="stat-label">Monthly Spending</div>
         <div class="stat-value color-yellow">
-            GHS {{ "%.2f" | format(monthly_total) }}
+            GHS {{ monthly_total | money }}
         </div>
-        <div class="stat-sub">this month</div>
-    </div>
-    <div class="stat-box">
+        <div class="stat-sub">this month — details</div>
+    </a>
+    <a href="{{ url_for('reports_reminders') }}"
+       class="stat-box stat-box--clickable">
         <div class="stat-label">Pending Reminders</div>
         <div class="stat-value color-green">
             {{ reminders | length }}
         </div>
-        <div class="stat-sub">to complete</div>
-    </div>
+        <div class="stat-sub">to complete — open list</div>
+    </a>
 </div>
 
 
@@ -404,6 +408,9 @@
                     💰 Recent Expenses
                 </div>
                 <div style="display:flex; gap:0.4rem;">
+                    <a href="{{ url_for('expenses_history') }}"
+                       class="btn btn-primary btn-sm"
+                       style="white-space:nowrap;">All history</a>
                     <!-- Amount filter -->
                     <select id="amount-filter"
                             onchange="runSearch()"
@@ -453,7 +460,7 @@
                         </div>
                     </td>
                     <td style="color:#fcc419; font-weight:600;">
-                        GHS {{ "%.2f" | format(e.amount) }}
+                        GHS {{ e.amount | money }}
                     </td>
                     <td style="color:var(--text-muted);
                                font-size:0.82rem;">
@@ -475,6 +482,11 @@
                 </tbody>
             </table>
             </div>
+            <p style="margin-top:0.85rem; font-size:0.8rem; color:var(--text-muted);">
+                Showing the <strong>25 most recent</strong> entries —
+                open <a href="{{ url_for('expenses_history') }}">full expense history</a>
+                for the complete ledger.
+            </p>
 
             {% else %}
             <div class="empty-state">No expenses recorded yet.</div>

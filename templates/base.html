@@ -897,7 +897,24 @@
             border-radius    : 12px;
             padding          : 1.2rem 1.5rem;
             box-shadow       : 0 2px 8px var(--shadow);
-            transition       : background-color 0.3s;
+            transition       : border-color 0.2s, box-shadow 0.2s, background-color 0.3s;
+        }
+
+        a.stat-box.stat-box--clickable {
+            display         : block;
+            text-decoration : none;
+            color           : inherit;
+            cursor          : pointer;
+        }
+
+        a.stat-box.stat-box--clickable:hover {
+            border-color : var(--text-brand);
+            box-shadow   : 0 4px 14px rgba(79, 158, 255, 0.12);
+        }
+
+        a.stat-box.stat-box--clickable:focus-visible {
+            outline        : 2px solid var(--text-brand);
+            outline-offset : 2px;
         }
 
         .stat-label {
@@ -1850,6 +1867,42 @@
             });
         })();
     </script>
+
+<script>
+window.nkuEscCsv = function (v) {
+    const s = v == null ? "" : String(v);
+    return '"' + s.replace(/"/g, '""') + '"';
+};
+window.nkuDownloadCsv = function (filename, headers, rows) {
+    const lines = [headers.map(nkuEscCsv).join(",")];
+    rows.forEach(function (row) {
+        lines.push(row.map(nkuEscCsv).join(","));
+    });
+    const blob = new Blob([lines.join("\r\n")], {
+        type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+};
+window.nkuSharePlain = async function (title, text) {
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: title || "Nku-OS", text: text });
+            return;
+        } catch (_) {}
+    }
+    try {
+        await navigator.clipboard.writeText(text);
+        alert("Summary copied — paste wherever you share from.");
+    } catch (_) {
+        prompt("Copy this text:", text);
+    }
+};
+</script>
 
 </body>
 </html>
